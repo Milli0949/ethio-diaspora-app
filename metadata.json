@@ -1,0 +1,6 @@
+{
+  "name": "ፍቅር በነፃ | Fikir BeNetsa",
+  "description": "ከ18 ዓመት በላይ ለሆኑ ኢትዮጵያውያን የተዘጋጀ ነፃ የትውውቅ እና ማህበራዊ መድረክ። Free Ethiopian dating and social platform for adults 18+.",
+  "requestFramePermissions": ["camera", "geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

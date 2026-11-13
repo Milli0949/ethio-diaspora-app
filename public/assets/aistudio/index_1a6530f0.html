@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="am">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>ፍቅር በነፃ | Fikir BeNetsa</title>
+<style>
+:root{--p:#e91e63;--bg:#121212;--sf:#1e1e1e;--tx:#fff;--sc:#aaa;--bd:#333;--ok:#4caf50;--prv:#9c27b0}
+body.light{--bg:#f4f5f7;--sf:#ffffff;--tx:#111111;--sc:#555555;--bd:#dddddd}
+*{box-sizing:border-box;margin:0;padding:0;font-family:sans-serif;-webkit-user-select:none;user-select:none}
+body{background:var(--bg);color:var(--tx);display:flex;justify-content:center;min-height:100vh}
+.app{width:100%;max-width:480px;height:100vh;background:var(--sf);display:flex;flex-direction:column;position:relative;overflow:hidden}
+.scr{flex:1;display:none;flex-direction:column;padding:15px;overflow-y:auto}
+.scr.on{display:flex}
+.hdr{display:none;justify-content:space-between;align-items:center;padding:12px 15px;border-bottom:1px solid var(--bd);background:var(--sf)}
+.nav{display:none;background:var(--bg);border-top:1px solid var(--bd);height:62px}
+.nav button{flex:1;background:none;border:none;color:var(--sc);font-size:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;position:relative}
+.nav button.on{color:var(--p);font-weight:bold}
+.badge{position:absolute;top:5px;right:12px;background:#ff1744;color:#fff;font-size:9px;padding:1px 5px;border-radius:10px}
+.btn{background:var(--p);color:#fff;border:none;padding:12px;border-radius:8px;font-size:14px;font-weight:bold;width:100%;margin-top:10px;cursor:pointer}
+.btn-s{background:rgba(128,128,128,0.2);color:var(--tx)}
+.btn-p{background:var(--prv);color:#fff}
+input,select,textarea{width:100%;padding:10px;margin:5px 0;background:var(--bg);border:1px solid var(--bd);color:var(--tx);border-radius:8px;font-size:14px}
+h2{font-size:18px;margin-bottom:8px}
+p{color:var(--sc);font-size:13px;line-height:1.5;margin-bottom:8px}
+.card{background:var(--bg);border:1px solid var(--bd);border-radius:12px;padding:12px;margin-bottom:10px}
+.av{width:60px;height:60px;border-radius:50%;background:var(--p);color:#fff;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:bold;overflow:hidden;flex-shrink:0}
+.av img,.slot img{width:100%;height:100%;object-fit:cover;pointer-events:none}
+.av-s{width:32px;height:32px;font-size:13px}
+.tag{display:inline-block;background:rgba(128,128,128,0.2);color:var(--tx);padding:3px 8px;border-radius:10px;font-size:11px;margin:2px}
+.row{display:flex;gap:8px;align-items:center}
+.g4{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin:8px 0}
+.slot{height:90px;background:var(--bg);border:1px dashed var(--bd);border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--sc);font-size:12px;overflow:hidden;cursor:pointer}
+.box{border:2px dashed var(--p);padding:12px;border-radius:10px;text-align:center;margin:8px 0;font-size:13px;cursor:pointer}
+.box.ok{border-color:var(--ok);color:var(--ok);background:rgba(76,175,80,0.1)}
+.cbox{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:8px;padding:8px 0}
+.mw{display:flex;gap:6px;align-items:flex-end;max-width:85%}
+.mw.ow{align-self:flex-end;flex-direction:row-reverse}
+.m{padding:8px 12px;border-radius:12px;font-size:13px;line-height:1.4}
+.in{background:var(--bg);border:1px solid var(--bd)}
+.out{background:var(--p);color:#fff}
+.tk{font-size:10px;margin-left:4px}.tk.sn{color:#40c4ff;font-weight:bold}
+.dl{display:inline-block;margin-top:5px;background:rgba(0,0,0,0.3);color:#fff;padding:3px 8px;border-radius:6px;font-size:11px;text-decoration:none}
+.clip{background:var(--bg);border:1px solid var(--bd);color:var(--tx);padding:9px 11px;border-radius:8px;font-size:16px}
+.trow{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--bd);font-size:13px}
+#tst{position:absolute;top:15px;left:50%;transform:translateX(-50%);background:var(--p);color:#fff;padding:8px 15px;border-radius:20px;font-size:12px;display:none;z-index:999;text-align:center}
+.mod{position:absolute;inset:0;background:rgba(0,0,0,0.88);display:none;flex-direction:column;justify-content:center;align-items:center;padding:20px;z-index:500;text-align:center;color:#fff}
+video{width:190px;height:190px;border-radius:50%;object-fit:cover;border:3px solid var(--p);margin:10px 0}
+.ncard{background:var(--bg);border-left:4px solid var(--p);border-radius:8px;padding:12px;margin-bottom:8px;display:flex;align-items:center;gap:10px}
+</style>
+</head>
+<body>
+<div class="app">
+<div id="tst"></div>
+<div id="m-mod" class="mod"><h1 style="color:var(--p)">🎉 It's a Match!</h1><p id="m-txt" style="color:#fff"></p><button class="btn" onclick="cMod('m-mod');tb('s-chat',document.getElementById('n-chat'))" data-am="መልእክት ላክ" data-en="Send Message">መልእክት ላክ</button><button class="btn btn-s" style="color:#fff" onclick="cMod('m-mod')" data-am="ቀጥል" data-en="Keep Browsing">ቀጥል</button></div>
+<div id="c-mod" class="mod"><h3 data-am="📸 የፊት ካሜራ ማረጋገጫ" data-en="📸 Selfie Verification">📸 የፊት ካሜራ ማረጋገጫ</h3><video id="vid" autoplay playsinline></video><button class="btn" onclick="sFace()" data-am="አረጋግጥ (Verify)" data-en="Verify Face">አረጋግጥ (Verify)</button><button class="btn btn-s" style="color:#fff" onclick="cCam()" data-am="ዝጋ" data-en="Close">ዝጋ</button></div>
+<div class="hdr" id="hdr"><b style="color:var(--p);font-size:16px">ፍቅር በነፃ | Fikir BeNetsa</b><div class="row"><button onclick="document.body.classList.toggle('light')" style="background:none;border:none;font-size:17px">🌓</button><button onclick="tL()" id="lb" style="background:none;border:1px solid var(--p);color:var(--p);padding:3px 8px;border-radius:10px;font-size:11px;font-weight:bold">English</button></div></div>
+<div class="hdr" id="phdr" style="border-color:var(--prv)"><b style="color:var(--prv);font-size:16px">🔞 Private (<span id="plbl"></span>)</b><button onclick="lPrv()" style="background:#d32f2f;color:#fff;border:none;padding:5px 10px;border-radius:8px;font-size:12px;font-weight:bold">Lock & Exit 🔒</button></div>
+<!-- Login -->
+<div id="s-log" class="scr on">
+<div style="display:flex;justify-content:flex-end;gap:8px"><button onclick="document.body.classList.toggle('light')" style="background:none;border:none;font-size:17px">🌓</button><button onclick="tL()" id="lb2" style="background:none;border:1px solid var(--p);color:var(--p);padding:3px 8px;border-radius:10px;font-size:11px;font-weight:bold">English</button></div>
+<h2 style="margin-top:10px;color:var(--p)">ፍቅር በነፃ | Fikir BeNetsa</h2>
+<p data-am="ከ18 ዓመት በላይ ለሆኑ ኢትዮጵያውያን የተዘጋጀ ነፃ የትውውቅ እና ማህበራዊ መድረክ።" data-en="Free Ethiopian dating and social platform for adults 18+.">ከ18 ዓመት በላይ ለሆኑ ኢትዮጵያውያን የተዘጋጀ ነፃ የትውውቅ እና ማህበራዊ መድረክ።</p>
+<div class="card">
+<h3 style="font-size:14px;margin-bottom:6px" data-am="በስልክ ወይም በኢሜይል ይግቡ (OTP)" data-en="Login via Phone or Email (OTP)">በስልክ ወይም በኢሜይል ይግቡ (OTP)</h3>
+<input id="oc" placeholder="ስልክ ቁጥር (09...) ወይም Email">
+<button class="btn" onclick="sOTP()" data-am="ኮድ ላክ (Send OTP)" data-en="Send OTP Code">ኮድ ላክ (Send OTP)</button>
+<div id="oa" style="display:none;margin-top:10px">
+<div id="oshow" style="background:rgba(76,175,80,0.15);border:1px solid #4caf50;color:#4caf50;padding:8px;border-radius:8px;text-align:center;font-weight:bold;margin-bottom:6px"></div>
+<input id="ocd" type="number" placeholder="ባለ 6 አሃዝ ኮድ / 6-Digit Code">
+<button class="btn" style="background:var(--ok)" onclick="vOTP()" data-am="አረጋግጥ እና ግባ" data-en="Verify & Login">አረጋግጥ እና ግባ</button>
+</div></div>
+<p style="font-size:11px;text-align:center" data-am="🔒 ፎቶ ማውረድ እና ስክሪንሾት ማንሳት የተከለከለ ነው።" data-en="🔒 Downloading photos and taking screenshots are strictly prohibited.">🔒 ፎቶ ማውረድ እና ስክሪንሾት ማንሳት የተከለከለ ነው።</p>
+</div>
+
+<!-- Registration / Edit Profile -->
+<div id="s-reg" class="scr">
+<h2 data-am="ሙሉ መገለጫ ይፍጠሩ / ያስተካክሉ" data-en="Create / Edit Full Profile">ሙሉ መገለጫ ይፍጠሩ / ያስተካክሉ</h2>
+<input id="rn" placeholder="ሙሉ ስም / Full Name">
+<input id="ra" type="number" placeholder="ዕድሜ / Age (18+)">
+<input id="rp" placeholder="ስልክ ቁጥር / Phone (Friends Only)">
+<select id="rg"><option value="">ጾታ ይምረጡ / Select Gender</option><option value="ወንድ">ወንድ / Male</option><option value="ሴት">ሴት / Female</option></select>
+<input id="rc" placeholder="ከተማ / City (e.g. Addis Ababa)">
+<input id="rj" placeholder="ስራ ወይም ትምህርት / Job or Education">
+<select id="rr"><option value="">ሃይማኖት / Religion</option><option>ኦርቶዶክስ / Orthodox</option><option>እስልምና / Muslim</option><option>ፕሮቴስታንት / Protestant</option><option>ሌላ / Other</option></select>
+<select id="rgl"><option value="">የትውውቅ ዓላማ / Relationship Goal</option><option>ለትዳር / Marriage</option><option>ለፍቅር ግንኙነት / Serious Relationship</option><option>ለጓደኝነት / Friendship</option></select>
+<input id="rh" placeholder="ፍላጎቶች / Hobbies (Music, Travel, Coffee)">
+<textarea id="rb" rows="2" placeholder="ስለራስዎ አጭር መግለጫ / Short Bio..."></textarea>
+<h3 style="font-size:13px;margin-top:6px;color:var(--p)" data-am="1 የፕሮፋይል ፎቶ + 3 ተጨማሪ ፎቶዎች (4ቱም ግዴታ ናቸው!)" data-en="1 Profile Photo + 3 Extra Photos (All 4 Required!)">1 የፕሮፋይል ፎቶ + 3 ተጨማሪ ፎቶዎች (4ቱም ግዴታ ናቸው!)</h3>
+<input type="file" id="finp" accept="image/*" style="display:none" onchange="hFile(event)">
+<div class="g4"><div class="slot" id="p0" onclick="pImg(0)">+ Profile</div><div class="slot" id="p1" onclick="pImg(1)">+ Photo 1</div><div class="slot" id="p2" onclick="pImg(2)">+ Photo 2</div><div class="slot" id="p3" onclick="pImg(3)">+ Photo 3</div></div>
+<div class="box" id="fbox" onclick="oCam()" data-am="📸 የፊት ካሜራ ማረጋገጫ (Selfie)" data-en="📸 Tap for Selfie Verification">📸 የፊት ካሜራ ማረጋገጫ (Selfie)</div>
+<div class="box" id="lbox" onclick="gLoc()" data-am="📍 ያሉበትን ቦታ ያረጋግጡ (Location)" data-en="📍 Tap to Verify GPS Location">📍 ያሉበትን ቦታ ያረጋግጡ (Location)</div>
+<button class="btn" onclick="sProf()" data-am="መገለጫ አስቀምጥ እና ቀጥል" data-en="Save Profile & Continue">መገለጫ አስቀምጥ እና ቀጥል</button>
+</div>
+
+<!-- Main Screen -->
+<div id="s-main" class="scr">
+<div class="row" style="margin-bottom:10px"><button class="btn" id="bu" style="margin:0" onclick="swM('u')" data-am="👥 ሰዎች" data-en="👥 People">👥 ሰዎች</button><button class="btn btn-s" id="bp" style="margin:0" onclick="swM('p')" data-am="📝 ፖስቶች" data-en="📝 Posts">📝 ፖስቶች</button></div>
+<div id="mu"><div id="dlist"></div></div>
+<div id="mp" style="display:none">
+<div class="card"><textarea id="ptx" rows="2" placeholder="ሃሳብዎን ያጋሩ... / Share your thoughts..."></textarea>
+<input type="file" id="pfinp" accept="image/*,video/*,audio/*" style="display:none" onchange="hPFile(event)">
+<div id="pflbl" style="font-size:11px;color:var(--ok)"></div>
+<div class="row"><button class="clip" onclick="document.getElementById('pfinp').click()">📎</button><select id="pvis" style="margin:0"><option value="all">🌍 Public</option><option value="friends">👥 Friends</option></select><button class="btn" style="margin:0;width:auto" onclick="addP()" data-am="ፖስት" data-en="Post">ፖስት</button></div></div>
+<div id="plist"></div>
+</div>
+</div>
+
+<!-- User Detail -->
+<div id="s-det" class="scr"><button class="btn btn-s" style="width:auto;margin-bottom:8px" onclick="go('s-main')" data-am="⬅ ተመለስ" data-en="⬅ Back">⬅ ተመለስ</button><div id="detc"></div></div>
+
+<!-- Matches & Search -->
+<div id="s-mat" class="scr"><h3 data-am="❤ ግጥምጥሞሽ (Matches)" data-en="❤ Matches">❤ ግጥምጥሞሽ (Matches)</h3><div id="mlist"></div></div>
+<div id="s-src" class="scr"><h3 data-am="🔍 በከተማ ይፈልጉ" data-en="🔍 Search by City">🔍 በከተማ ይፈልጉ</h3><input id="sloc" placeholder="ከተማ ይጻፉ / Type city name..." onkeyup="rSrc()"><div id="sres" style="margin-top:8px"></div></div>
+
+<!-- Normal Chat -->
+<div id="s-chat" class="scr">
+<div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--bd);padding-bottom:6px">
+<div class="row"><div class="av av-s" id="cav">ሰ</div><div><b id="cw">ሰላም, 24</b><br><span style="font-size:10px;color:var(--ok)">● Online</span></div></div>
+<div><button onclick="tst('Blocked!');go('s-main')" style="background:#333;color:#ff5252;border:none;padding:4px 7px;border-radius:5px;font-size:11px">Block</button><button onclick="tst('Reported!')" style="background:#333;color:#ffb74d;border:none;padding:4px 7px;border-radius:5px;font-size:11px">Report</button></div>
+</div>
+<div id="rprev" style="display:none;background:var(--bg);padding:5px 8px;border-left:3px solid var(--p);font-size:11px;margin-top:5px;justify-content:space-between"><span id="rtxt"></span><b onclick="rpl='';document.getElementById('rprev').style.display='none'">✖</b></div>
+<div class="cbox" id="cbox"></div>
+<input type="file" id="catt" accept="*/*" style="display:none" onchange="sAtt(event)">
+<div class="row"><button class="clip" onclick="document.getElementById('catt').click()">📎</button><input id="cin" placeholder="መልእክት... / Message..." style="margin:0"><button class="btn" style="width:auto;margin:0" onclick="snd()" data-am="ላክ" data-en="Send">ላክ</button></div>
+</div>
+
+<!-- Notifications -->
+<div id="s-not" class="scr"><h3 data-am="🔔 ማሳወቂያዎች" data-en="🔔 Notifications">🔔 ማሳወቂያዎች</h3>
+<div class="ncard"><div class="av av-s">ሰ</div><div><b>ሰላም, 24</b><p style="margin:0" data-am="የእርስዎን መገለጫ ወዳዋለች (Match)።" data-en="Liked your profile (It's a Match).">የእርስዎን መገለጫ ወዳዋለች (Match)።</p></div></div>
+<div class="ncard"><div class="av av-s" style="background:#2196f3">ዳ</div><div><b>ዳዊት, 28</b><p style="margin:0" data-am="የጓደኝነት ጥያቄ ልኮልዎታል።" data-en="Sent you a friend request.">የጓደኝነት ጥያቄ ልኮልዎታል።</p></div></div>
+</div>
+
+<!-- Private Gate -->
+<div id="s-prv" class="scr">
+<div class="card" style="border-color:var(--prv)"><h2 style="color:var(--prv)" data-am="🔒 ልዩ የግላዊነት መለያ (Private Account)" data-en="🔒 Standalone Private Account">🔒 ልዩ የግላዊነት መለያ (Private Account)</h2>
+<p data-am="ይህ ክፍል ከዋናው አካውንት ሙሉ በሙሉ ተለይቶ ወደ ራሱ ዝግ ዓለም የሚያስገባ መለያ ነው። የራሱ ቻት፣ ፖስት፣ ፍለጋ እና Setting አለው።" data-en="Completely separate private space with its own chat, posts, search, and settings.">ይህ ክፍል ከዋናው አካውንት ሙሉ በሙሉ ተለይቶ ወደ ራሱ ዝግ ዓለም የሚያስገባ መለያ ነው። የራሱ ቻት፣ ፖስት፣ ፍለጋ እና Setting አለው።</p>
+<input id="pal" placeholder="የሚስጥር መጠሪያ ስም / Private Alias"><input id="ppin" type="password" maxlength="4" placeholder="ባለ 4 አሃዝ PIN / 4-Digit PIN">
+<button class="btn btn-p" onclick="ePrv()" data-am="ወደ Private Account ግባ" data-en="Enter Private Account">ወደ Private Account ግባ</button></div>
+</div>
+
+<!-- Standalone Private Screens -->
+<div id="p-main" class="scr"><h3 style="color:var(--prv)">🔞 Private Posts (No Download)</h3>
+<div class="card" style="border-color:var(--prv)"><textarea id="ppt" rows="2" placeholder="በግል መለያዎ ፖስት ያድርጉ... / Private post..."></textarea><button class="btn btn-p" onclick="aPrvP()" data-am="ፖስት" data-en="Post">ፖስት</button></div><div id="pplist"></div></div>
+<div id="p-src" class="scr"><h3 style="color:var(--prv)">🔍 Private Search</h3><input placeholder="ሚስጥራዊ ተጠቃሚ ይፈልጉ... / Search alias..." onkeyup="tst('Searching...')"><div class="card"><b>Mystery_18</b> • 📍 አዲስ አበባ <button class="btn btn-p" style="padding:6px" onclick="ptb('p-chat',document.getElementById('pn-chat'))">Private Chat</button></div></div>
+<div id="p-chat" class="scr"><h3 style="color:var(--prv)">💬 Private Chat</h3><div class="cbox" id="pcbox"><div class="mw"><div class="m in" style="border-color:var(--prv)">ዝግ የውይይት ክፍል ተከፍቷል። / Private room unlocked.</div></div></div><div class="row"><input id="pcin" placeholder="ሚስጥራዊ መልእክት... / Secret message..." style="margin:0"><button class="btn btn-p" style="width:auto;margin:0" onclick="sPrv()" data-am="ላክ" data-en="Send">ላክ</button></div></div>
+<div id="p-not" class="scr"><h3 style="color:var(--prv)">🔔 Private Notifications</h3><div class="ncard" style="border-color:var(--prv)"><b>Mystery_18</b><p style="margin:0">Reacted 🔥 to your private post.</p></div></div>
+<script>
+let lang='am',otp='',ph=[null,null,null,null],sl=0,fOk=0,lOk=0,stm=null,rpl='',pmd=null;
+let usr=JSON.parse(localStorage.getItem('fb_u'))||null,mp=localStorage.getItem('fb_mp')||'all';
+const bad=['ብልግና','ወሲብ','sex','porn','xxx','nude'];
+const db=[
+{id:1,n:"ሰላም, 24",c:"አዲስ አበባ",p:"0911223344",j:"ነርስ",r:"ኦርቶዶክስ",g:"ለትዳር",h:"ሙዚቃ, ቡና",b:"እውነተኛ ትዳር እፈልጋለሁ።",fr:1,lk:1,cl:"#e91e63"},
+{id:2,n:"ዳዊት, 28",c:"ባህር ዳር",p:"0922334455",j:"ኢንጂነር",r:"ኦርቶዶክስ",g:"ለፍቅር",h:"ስፖርት, ጉዞ",b:"አክባሪ ሴት እፈልጋለሁ።",fr:0,lk:1,cl:"#2196f3"},
+{id:3,n:"ሜሮን, 23",c:"ሀዋሳ",p:"0933445566",j:"ተማሪ",r:"ፕሮቴስታንት",g:"ለጓደኝነት",h:"ሙዚቃ, ፊልም",b:"አዲስ ጓደኞችን ማፍራት እወዳለሁ።",fr:0,lk:0,cl:"#4caf50"}
+];
+let posts=[{id:1,a:"ሰላም, 24",t:"ሰላም ኢትዮጵያ! ዛሬ አዲስ አበባ አየሩ ደስ ይላል ☕❤️",l:12,cm:["ትክክል!"],v:"all",m:null}];
+let pPosts=[{id:1,a:"Mystery_18",t:"በዚህ ዝግ ክፍል ውስጥ ነፃ ውይይት እናድርግ 🔥",l:5}];
+let msgs=[{f:"in",t:"ሰላም! እንዴት ነህ/ነሽ? 😊",s:"seen"}];
+
+function tst(m){let e=document.getElementById('tst');e.innerText=m;e.style.display='block';setTimeout(()=>e.style.display='none',2500)}
+function go(id){
+document.querySelectorAll('.scr').forEach(s=>s.classList.remove('on'));document.getElementById(id).classList.add('on');
+let mTabs=['s-main','s-mat','s-src','s-chat','s-not','s-prv','s-set','s-det'];
+let pTabs=['p-main','p-src','p-chat','p-not','p-set'];
+document.getElementById('hdr').style.display=mTabs.includes(id)?'flex':'none';
+document.getElementById('nav').style.display=mTabs.includes(id)?'flex':'none';
+document.getElementById('phdr').style.display=pTabs.includes(id)?'flex':'none';
+document.getElementById('pnav').style.display=pTabs.includes(id)?'flex':'none';
+}
+function tb(id,b){go(id);document.querySelectorAll('#nav button').forEach(x=>x.classList.remove('on'));if(b)b.classList.add('on')}
+function ptb(id,b){go(id);document.querySelectorAll('#pnav button').forEach(x=>x.classList.remove('on'));if(b){b.classList.add('on');b.style.color='var(--prv)'}}
+function cMod(id){document.getElementById(id).style.display='none'}
+
+function sOTP(){let c=document.getElementById('oc').value.trim();if(!c)return tst(lang==='am'?"ስልክ ወይም ኢሜይል ያስገቡ!":"Enter phone or email!");otp=Math.floor(100000+Math.random()*900000).toString();document.getElementById('oa').style.display='block';document.getElementById('oshow').innerText="📩 OTP: "+otp;document.getElementById('ocd').value=otp;tst(lang==='am'?"ኮዱ ተልኳል!":"OTP Sent!");}
+function vOTP(){if(document.getElementById('ocd').value.trim()!==otp)return tst(lang==='am'?"የተሳሳተ ኮድ!":"Invalid OTP!");usr?lApp():go('s-reg');}
+
+function pImg(i){sl=i;document.getElementById('finp').click()}
+function hFile(e){let f=e.target.files[0];if(!f)return;let r=new FileReader();r.onload=v=>{ph[sl]=v.target.result;document.getElementById('p'+sl).innerHTML=`<img src="${v.target.result}">`;tst("Photo "+(sl+1)+" uploaded!");};r.readAsDataURL(f);}
+async function oCam(){document.getElementById('c-mod').style.display='flex';try{stm=await navigator.mediaDevices.getUserMedia({video:{facingMode:"user"}});document.getElementById('vid').srcObject=stm;}catch(e){tst("Camera not found, tap verify.");}}
+function sFace(){fOk=1;let b=document.getElementById('fbox');b.classList.add('ok');b.innerText="✔ Selfie Verified";cCam();}
+function cCam(){if(stm)stm.getTracks().forEach(t=>t.stop());document.getElementById('c-mod').style.display='none';}
+function gLoc(){lOk=1;let b=document.getElementById('lbox');b.classList.add('ok');b.innerText="✔ Location Verified";tst("Location Verified!");}
+
+function sProf(){
+let n=document.getElementById('rn').value.trim(),a=parseInt(document.getElementById('ra').value),p=document.getElementById('rp').value.trim(),g=document.getElementById('rg').value,c=document.getElementById('rc').value.trim(),j=document.getElementById('rj').value.trim(),r=document.getElementById('rr').value,gl=document.getElementById('rgl').value,h=document.getElementById('rh').value.trim(),b=document.getElementById('rb').value.trim();
+if(!n||!a||a<18||!g||!c)return tst(lang==='am'?"ስም፣ ዕድሜ (18+)፣ ጾታ እና ከተማ ይሙሉ!":"Fill name, age (18+), gender & city!");
+if(ph.filter(Boolean).length<4)return tst(lang==='am'?"4 ፎቶዎችን መጫን ግዴታ ነው!":"All 4 photos are required!");
+if(!fOk||!lOk)return tst(lang==='am'?"የፊት ካሜራ እና ቦታ ያረጋግጡ!":"Verify selfie and location!");
+usr={n,a,p,g,c,j,r,gl,h,b,ph};
+try{localStorage.setItem('fb_u',JSON.stringify(usr));}catch(e){}
+lApp();
+}
+
+function lApp(){
+try{document.getElementById('mprv').value=mp;}catch(e){}
+rMyProf();rD();rP();rM();rS();rC();go('s-main');
+}
+
+function rMyProf(){
+if(!usr)return;
+let firstImg=usr.ph.find(Boolean);
+let p0=firstImg?`<img src="${firstImg}">`:usr.n;
+let gridHtml='';
+for(let i=0;i<4;i++){gridHtml+=`<div class="slot">${usr.ph[i]?`<img src="${usr.ph[i]}">`:'Photo '+(i+1)}</div>`;}
+document.getElementById('my-prof-card').innerHTML=`<div style="text-align:center">
+<div class="av" style="width:75px;height:75px;margin:0 auto 8px">${p0}</div>
+<h3>${usr.n}, ${usr.a} ✔</h3><p>📍 ${usr.c} | 💼 ${usr.j} | 📞 ${usr.p}</p>
+<div><span class="tag">${usr.r}</span><span class="tag">${usr.gl}</span><span class="tag">${usr.h}</span></div>
+<p style="margin:6px 0;color:var(--tx)">"${usr.b}"</p>
+<div class="g4">${gridHtml}</div>
+<div class="row"><button class="btn btn-s" onclick="editProf()">✏️ Edit Profile</button><button class="btn" style="background:#d32f2f" onclick="delAcc()">🗑️ Delete</button></div>
+</div>`;
+}
+
+
+function swM(s){document.getElementById('mu').style.display=s==='u'?'block':'none';document.getElementById('mp').style.display=s==='p'?'block':'none';document.getElementById('bu').className=s==='u'?'btn':'btn btn-s';document.getElementById('bp').className=s==='p'?'btn':'btn btn-s';}
+function rD(){let b=document.getElementById('dlist');b.innerHTML='';db.forEach(u=>{b.innerHTML+=`<div class="card"><div class="row" onclick="vU(${u.id})"><div class="av" style="background:${u.cl}">${u.n[0]}</div><div><b>${u.n} ✔</b><p style="margin:0">📍 ${u.c} | 💼 ${u.j}</p><span class="tag">${u.g}</span></div></div><p style="margin-top:6px">"${u.b}"</p><div class="row"><button class="btn btn-s" onclick="u.fr=!u.fr;rD()">${u.fr?'✔ Friends':'➕ Add Friend'}</button><button class="btn" onclick="lkU(${u.id})">❤ Like</button><button class="btn btn-s" onclick="oC(${u.id})">💬 Chat</button></div></div>`;});}
+function vU(id){let u=db.find(x=>x.id===id);document.getElementById('detc').innerHTML=`<div class="card" style="text-align:center"><div class="av" style="width:80px;height:80px;margin:0 auto 8px;background:${u.cl}">${u.n[0]}</div><h2>${u.n} ✔</h2><p>📍 ${u.c} | 💼 ${u.j}</p><p>${u.fr?'📞 '+u.p:'🔒 Add friend to view phone'}</p><div><span class="tag">${u.r}</span><span class="tag">${u.g}</span><span class="tag">${u.h}</span></div><p style="color:var(--tx);margin:8px 0">"${u.b}"</p><div class="g4"><div class="slot">🔒 Photo 1</div><div class="slot">🔒 Photo 2</div><div class="slot">🔒 Photo 3</div><div class="slot">🔒 Photo 4</div></div><button class="btn" onclick="oC(${u.id})">💬 Private Chat</button></div>`;go('s-det');}
+function lkU(id){let u=db.find(x=>x.id===id);u.lk?(document.getElementById('m-txt').innerText=`You and ${u.n} liked each other!`,document.getElementById('m-mod').style.display='flex'):tst(`❤ Liked ${u.n}!`);}
+
+function hPFile(e){let f=e.target.files[0];if(!f)return;let r=new FileReader();r.onload=v=>{pmd={n:f.name,u:v.target.result,t:f.type};document.getElementById('pflbl').innerText="📎 "+f.name;};r.readAsDataURL(f);}
+function addP(){let t=document.getElementById('ptx').value.trim(),v=document.getElementById('pvis').value;if(!t&&!pmd)return;if(bad.some(w=>t.toLowerCase().includes(w))){document.getElementById('ptx').value='';return tst("🚫 Profanity blocked on main feed!");}posts.unshift({id:Date.now(),a:usr.n,t,l:0,cm:[],v,m:pmd});document.getElementById('ptx').value='';document.getElementById('pflbl').innerText='';pmd=null;rP();}
+function dlP(id){let p=posts.find(x=>x.id===id),a=document.createElement('a');a.href=p.m?p.m.u:URL.createObjectURL(new Blob([`${p.a}:\n${p.t}`],{type:'text/plain'}));a.download=p.m?p.m.n:`Post_${id}.txt`;a.click();tst("⬇️ Downloaded!");}
+function rP(){let b=document.getElementById('plist');b.innerHTML='';posts.forEach(p=>{let m=p.m?(p.m.t.startsWith('image/')?`<img src="${p.m.u}" style="width:100%;border-radius:8px;margin-top:6px">`:`<div class="tag">📎 ${p.m.n}</div>`):'';b.innerHTML+=`<div class="card"><b>${p.a}</b> <span class="tag">${p.v==='all'?'🌍 Public':'👥 Friends'}</span><p style="color:var(--tx);margin:6px 0">${p.t}</p>${m}<div class="row"><button class="btn btn-s" style="margin:0;padding:5px;font-size:11px" onclick="p.l++;rP()">❤ (${p.l})</button><button class="btn btn-s" style="margin:0;padding:5px;font-size:11px" onclick="let c=prompt('Comment:');if(c&&!bad.some(w=>c.includes(w))){p.cm.push(c);rP()}">💬 (${p.cm.length})</button><button class="btn btn-s" style="margin:0;padding:5px;font-size:11px;color:var(--ok)" onclick="dlP(${p.id})">⬇️ Download</button></div></div>`;});}
+
+function rM(){let b=document.getElementById('mlist');b.innerHTML='';db.filter(u=>u.lk).forEach(u=>{b.innerHTML+=`<div class="card row" style="justify-content:space-between"><div class="row" onclick="vU(${u.id})"><div class="av av-s" style="background:${u.cl}">${u.n[0]}</div><div><b>${u.n}</b><p style="margin:0">📍 ${u.c}</p></div></div><button class="btn" style="width:auto;margin:0;padding:7px" onclick="oC(${u.id})">Chat</button></div>`;});}
+function rM(){let b=document.getElementById('mlist');b.innerHTML='';db.filter(u=>u.lk).forEach(u=>{b.innerHTML+=`<div class="card row" style="justify-content:space-between"><div class="row" onclick="vU(${u.id})"><div class="av av-s" style="background:${u.cl}">${u.n}</div><div><b>${u.n}</b><p style="margin:0">📍 ${u.c}</p></div></div><button class="btn" style="width:auto;margin:0;padding:7px" onclick="oC(${u.id})">Chat</button></div>`;});}
+function rS(){let q=document.getElementById('sloc').value.toLowerCase(),b=document.getElementById('sres');b.innerHTML='';db.filter(u=>u.c.toLowerCase().includes(q)).forEach(u=>{b.innerHTML+=`<div class="card row" style="justify-content:space-between"><div onclick="vU(${u.id})"><b>${u.n}</b><p style="margin:0">📍 ${u.c}</p></div><button class="btn" style="width:auto;margin:0;padding:7px" onclick="oC(${u.id})">Chat</button></div>`;});}
+
+function oC(id){let u=db.find(x=>x.id===id);if(mp==='none')return tst("🔒 Messages locked!");if(mp==='friends'&&!u.fr)return tst("🔒 Friends only!");document.getElementById('cw').innerText=u.n;document.getElementById('cav').innerText=u.n;tb('s-chat',document.getElementById('n-chat'));document.getElementById('ubdg').style.display='none';}
+function rC(){let b=document.getElementById('cbox');b.innerHTML='';let p=(usr&&usr.ph&&usr.ph)?`<img src="${usr.ph}">`:(usr?usr.n:'እ');msgs.forEach(m=>{let tk=m.f==='out'?`<span class="tk ${m.s==='seen'?'sn':''}">✓✓</span>`:'';let av=m.f==='out'?`<div class="av av-s">${p}</div>`:`<div class="av av-s">ሰ</div>`;let fh=m.fl?`<div>📎 <b>${m.fl.n}</b><br><a href="${m.fl.u}" download="${m.fl.n}" class="dl" onclick="event.stopPropagation()">⬇️ Download</a></div>`:'';b.innerHTML+=`<div class="mw ${m.f==='out'?'ow':''}" onclick="rpl='${m.t||'File'}';document.getElementById('rprev').style.display='flex';document.getElementById('rtxt').innerText='↪ '+rpl">${av}<div class="m ${m.f}">${m.t}${fh}${tk}</div></div>`;});b.scrollTop=b.scrollHeight;}
+function sAtt(e){if(mp==='none')return tst("🔒 Messages locked!");let f=e.target.files;if(!f)return;let r=new FileReader();r.onload=v=>{msgs.push({f:"out",t:"",fl:{n:f.name,u:v.target.result},s:"seen"});rC();tst("📎 Sent!");};r.readAsDataURL(f);}
+function snd(){if(mp==='none')return tst("🔒 Messages locked!");let i=document.getElementById('cin'),t=i.value.trim();if(!t)return;msgs.push({f:"out",t:(rpl?`[↪ ${rpl}]\n`:'')+t,s:"seen"});i.value='';rpl='';document.getElementById('rprev').style.display='none';rC();setTimeout(()=>{msgs.push({f:"in",t:"Message seen! 😊"});rC();},1000);}
+
+function ePrv(){let a=document.getElementById('pal').value.trim(),p=document.getElementById('ppin').value.trim();if(!a||p.length<4)return tst("Enter alias & 4-digit PIN!");document.getElementById('plbl').innerText=a;rPP();ptb('p-main',document.querySelector('#pnav button'));tst("🔞 Private Account Unlocked!");}
+function lPrv(){tb('s-main',document.querySelector('#nav button'));tst("🔒 Private Account Locked!");}
+function sPrv(){let i=document.getElementById('pcin'),t=i.value.trim();if(!t)return;document.getElementById('pcbox').innerHTML+=`<div class="mw ow"><div class="m out" style="background:var(--prv)">${t}</div></div>`;i.value='';}
+function aPrvP(){let t=document.getElementById('ppt').value.trim();if(!t)return;pPosts.unshift({id:Date.now(),a:document.getElementById('plbl').innerText,t,l:0});document.getElementById('ppt').value='';rPP();}
+function rPP(){let b=document.getElementById('pplist');b.innerHTML='';pPosts.forEach(p=>{b.innerHTML+=`<div class="card" style="border-color:var(--prv)"><b>${p.a}</b><p style="color:var(--tx);margin:5px 0">${p.t}</p><button class="btn btn-s" style="margin:0;padding:4px" onclick="p.l++;rPP()">🔥 Like (${p.l})</button></div>`;});}
+
+function tL(){
+lang=lang==='am'?'en':'am';
+document.getElementById('lb').innerText=lang==='am'?'English':'አማርኛ';
+document.getElementById('lb2').innerText=lang==='am'?'English':'አማርኛ';
+document.querySelectorAll('[data-am]').forEach(e=>e.innerText=e.getAttribute('data-'+lang));
+tst(lang==='am'?"ቋንቋ ወደ አማርኛ ተቀይሯል":"Language switched to English");
+}
+function delAcc(){if(confirm(lang==='am'?"መለያዎን እስከመጨረሻው ማጥፋት ይፈልጋሉ?":"Delete your account permanently?")){localStorage.clear();usr=null;ph=[null,null,null,null];fOk=0;lOk=0;go('s-log');tst("🗑️ Deleted!");}}
+if(usr)lApp();
+</script>
+</body>
+</html>
