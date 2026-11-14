@@ -438,7 +438,64 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                   <button
                     type="submit"
                     disabled={loading}
-                    interface RegisterScreenProps {
+                                        className="w-full min-h-[44px] rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white font-semibold text-xs transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    {lang === 'am' ? 'የማረጋገጫ ኮድ ላክ' : 'Send Reset OTP'}
+                  </button>
+                </form>
+
+                {resetOtp && (
+                  <form onSubmit={handleConfirmResetPassword} className="pt-3 border-t border-zinc-200 dark:border-zinc-800 space-y-3">
+                    <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/30 px-3 py-2 text-center text-xs text-emerald-600 dark:text-emerald-400 font-mono">
+                      OTP: {resetOtp}
+                    </div>
+                    <input
+                      type="text"
+                      value={resetCodeInput}
+                      onChange={(e) => setResetCodeInput(e.target.value)}
+                      placeholder={lang === 'am' ? 'ባለ 6 አሃዝ ኮድ' : '6-Digit OTP'}
+                      className="w-full min-h-[44px] rounded-xl bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 px-3.5 text-sm text-center font-mono focus:outline-none focus:border-emerald-500"
+                    />
+                    <input
+                      type="password"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      placeholder={lang === 'am' ? 'አዲስ የይለፍ ቃል (New Password)' : 'New Password (min 4 chars)'}
+                      className="w-full min-h-[44px] rounded-xl bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 px-3.5 text-sm focus:outline-none focus:border-rose-500"
+                    />
+                    <button
+                      type="submit"
+                      disabled={loading}
+                      className="w-full min-h-[46px] rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-sm transition-colors cursor-pointer"
+                    >
+                      {lang === 'am' ? 'አዲሱን የይለፍ ቃል አስቀምጥ' : 'Save New Password'}
+                    </button>
+                  </form>
+                )}
+              </div>
+            )}
+
+            <div className="mt-5 pt-4 border-t border-zinc-200 dark:border-zinc-800 flex items-start gap-2 text-xs text-zinc-500 dark:text-zinc-400">
+              <Lock className="w-4 h-4 shrink-0 text-zinc-400 mt-0.5" />
+              <span>
+                {lang === 'am'
+                  ? 'ፎቶ ማውረድ እና ስክሪንሾት ማንሳት የተከለከለ ነው። ከ18 ዓመት በላይ ለሆኑ ብቻ።'
+                  : 'Downloading photos and taking screenshots are strictly prohibited. Adults 18+ only.'}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <footer className="text-center text-xs text-zinc-500 dark:text-zinc-500 py-2">
+        ፍቅር በነፃ · Fikir BeNetsa — 18+ Community
+      </footer>
+    </div>
+  );
+};
+
+interface RegisterScreenProps {
   lang: Lang;
   initialProfile: UserProfile | null;
   isEditing: boolean;
