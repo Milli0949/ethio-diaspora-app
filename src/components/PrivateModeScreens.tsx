@@ -69,89 +69,196 @@ export const PrivateGateScreen: React.FC<PrivateGateScreenProps> = ({
       );
       return;
     }
+export const PrivateGateScreen: React.FC<PrivateGateScreenProps> = ({
+  lang,
+  savedConfig,
+  onUnlock,
+  onResetVault,
+  onNotify,
+}) => {
+  const [alias, setAlias] = useState(savedConfig?.alias || '');
+  const [password, setPassword] = useState('');
+  const [mode, setMode] = useState<'login' | 'create' | 'reset'>(savedConfig ? 'login' : 'create');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmReset, setConfirmReset] = useState(false);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanedAlias = alias.trim();
+    const cleanedPass = password.trim();
+
+    if (!cleanedAlias || cleanedPass.length < 4) {
+      onNotify(
+        lang === 'am'
+          ? 'የግል መጠሪያ ስም (Username) እና ቢያንስ 4 ቁምፊ የይለፍ ቃል (Password) ያስገቡ!'
+          : 'Enter a private username and at least 4-character password!'
+      );
+      return;
+    }
+
+    if (savedConfig && mode === 'login') {
+      if (savedConfig.alias.toLowerCase() !== cleanedAlias.toLowerCase() || savedConfig.pin !== cleanedPass) {
+        onNotify(
+          lang === 'am'
+            ? 'የተሳሳተ Username ወይም Password ነው! እንደገና ይሞክሩ።'
+            : 'Incorrect Username or Password! Try again.'
+        );
+        return;
+      }
+    }
 
     onUnlock({
       alias: cleanedAlias,
-      pin: cleanedPin,
+      pin: cleanedPass,
       disappearing: savedConfig?.disappearing ?? false,
     });
   };
 
+  const handleResetPasswordSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!savedConfig) return;
+    if (alias.trim().toLowerCase() !== savedConfig.alias.toLowerCase()) {
+      onNotify(lang === 'am' ? 'የተመዘገበውን የግል Username በትክክል ያስገቡ!' : 'Enter your exact private username!');
+      return;
+    }
+    if (newPassword.trim().length < 4) {
+      onNotify(lang === 'am' ? 'አዲሱ የይለፍ ቃል ቢያንስ 4 ቁምፊ መሆን አለበት!' : 'New password must be at least 4 chars!');
+      return;
+    }
+    onUnlock({
+      alias: savedConfig.alias,
+      pin: newPassword.trim(),
+      disappearing: savedConfig.disappearing ?? false,
+    });
+    onNotify(lang === 'am' ? 'የግል መለያ የይለፍ ቃል ተቀይሯል!' : 'Private vault password updated!');
+  };
+
   return (
     <div className="max-w-lg mx-auto w-full py-4">
-      <div className="rounded-3xl bg-white dark:bg-zinc-900 border border-purple-500/40 p-6 space-y-5">
+      <div className="rounded-3xl bg-white dark:bg-zinc-900 border border-purple-500/30 p-6 space-y-5 shadow-sm">
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-2xl bg-purple-600/15 text-purple-500 flex items-center justify-center shrink-0">
+          <div className="w-12 h-12 rounded-2xl bg-purple-600/15 text-purple-500 flex items-center justify-center">
             <Lock className="w-6 h-6" />
           </div>
           <div>
             <h2 className="text-lg font-bold text-purple-600 dark:text-purple-400">
-              {lang === 'am'
-                ? 'ልዩ የግላዊነት መለያ (18+ Private Account)'
-                : 'Standalone Private Account (18+)'}
+              {lang === 'am' ? 'ዝግ የግል መለያ (18+ Private Account)' : 'Standalone Private Account (18+)'}
             </h2>
             <p className="text-xs text-zinc-500 dark:text-zinc-400">
               {savedConfig
                 ? lang === 'am'
-                  ? `የተቀመጠ መለያ (${savedConfig.alias}) — PIN ያስገቡ`
-                  : `Saved vault (${savedConfig.alias}) — enter your PIN`
+                  ? `የተቆለፈ የግል መለያ (${savedConfig.alias}) — በ Username እና Password ይግቡ`
+                  : `Saved vault (${savedConfig.alias}) — enter Username & Password`
                 : lang === 'am'
-                  ? 'አዲስ የሚስጥር ስም እና PIN ይፍጠሩ'
-                  : 'Create a private alias and 4-digit PIN'}
+                  ? 'አዲስ የግል Username እና Password ይፍጠሩ'
+                  : 'Create a private username and password'}
             </p>
           </div>
         </div>
 
-        <p className="text-sm text-zinc-600 dark:text-zinc-300 leading-relaxed">
+        <p className="text-xs text-zinc-600 dark:text-zinc-300 leading-relaxed">
           {lang === 'am'
-            ? 'ይህ ክፍል ከዋናው አካውንት ሙሉ በሙሉ ተለይቶ ወደ ራሱ ዝግ ዓለም የሚያስገባ መለያ ነው። የራሱ ቻት፣ ፖስት (ያለ ማውረድ)፣ ፍለጋ እና Setting አለው።'
-            : 'Completely isolated from your main profile. Features its own private feed (zero download), private search, encrypted-style chat, notifications, and PIN settings.'}
+            ? 'ይህ ክፍል ከዋናው መለያዎ ሙሉ በሙሉ የተለየ ራሱን የቻለ ዓለም ነው። ፎቶ ማውረድ ዝግ ነው።'
+            : 'Completely isolated from your main profile. Features its own feed, search, and private chat.'}
         </p>
 
-        <form onSubmit={handleSubmit} className="space-y-3">
-          <div>
-            <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">
-              {lang === 'am' ? 'የሚስጥር መጠሪያ ስም' : 'Private Alias'}
-            </label>
-            <input
-              value={alias}
-              onChange={(e) => setAlias(e.target.value)}
-              placeholder={lang === 'am' ? 'ምሳሌ፡ Mystery_Addis' : 'e.g. Mystery_Addis'}
-              className="w-full min-h-[44px] rounded-xl bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 px-3.5 text-sm text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-purple-500"
-            />
-          </div>
+        {mode !== 'reset' ? (
+          <form onSubmit={handleSubmit} className="space-y-3">
+            <div>
+              <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">
+                {lang === 'am' ? 'የግል መጠሪያ ስም (Username)' : 'Private Username'}
+              </label>
+              <input
+                value={alias}
+                onChange={(e) => setAlias(e.target.value)}
+                placeholder={lang === 'am' ? 'ምሳሌ፡ Mystery_Addis' : 'e.g. Mystery_Addis'}
+                className="w-full min-h-[44px] rounded-xl bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 px-3.5 text-sm text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-purple-500"
+              />
+            </div>
 
-          <div>
-            <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">
-              {lang === 'am' ? 'ባለ 4 አሃዝ PIN' : '4-Digit PIN'}
-            </label>
-            <input
-              type="password"
-              inputMode="numeric"
-              maxLength={4}
-              value={pin}
-              onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
-              placeholder="••••"
-              className="w-full min-h-[44px] rounded-xl bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 px-3.5 text-sm text-center tracking-[0.5em] font-mono text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-purple-500"
-            />
-          </div>
+            <div>
+              <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">
+                {lang === 'am' ? 'የይለፍ ቃል (Password)' : 'Private Password'}
+              </label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••"
+                className="w-full min-h-[44px] rounded-xl bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 px-3.5 text-sm text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-purple-500"
+              />
+            </div>
 
-          <button
-            type="submit"
-            className="w-full min-h-[48px] rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-semibold text-sm transition-colors cursor-pointer"
-          >
-            {lang === 'am' ? 'ወደ Private Account ግባ' : 'Unlock Private Account'}
-          </button>
-        </form>
+            {savedConfig && (
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setMode('reset')}
+                  className="text-xs font-medium text-purple-600 dark:text-purple-400 hover:underline cursor-pointer"
+                >
+                  {lang === 'am' ? 'የግል Password ረሱ? (Reset Password)' : 'Forgot / Reset Private Password?'}
+                </button>
+              </div>
+            )}
+
+            <button
+              type="submit"
+              className="w-full min-h-[48px] rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-semibold text-sm transition-colors cursor-pointer"
+            >
+              {lang === 'am' ? 'ወደ Private Account ግባ' : 'Unlock Private Account'}
+            </button>
+          </form>
+        ) : (
+          <form onSubmit={handleResetPasswordSubmit} className="space-y-3">
+            <div>
+              <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">
+                {lang === 'am' ? 'የግል Username ያረጋግጡ' : 'Confirm Private Username'}
+              </label>
+              <input
+                value={alias}
+                onChange={(e) => setAlias(e.target.value)}
+                placeholder={savedConfig?.alias || 'Username'}
+                className="w-full min-h-[44px] rounded-xl bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 px-3.5 text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">
+                {lang === 'am' ? 'አዲስ የይለፍ ቃል (New Password)' : 'New Password (min 4 chars)'}
+              </label>
+              <input
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="••••••"
+                className="w-full min-h-[44px] rounded-xl bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 px-3.5 text-sm"
+              />
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setMode('login')}
+                className="flex-1 min-h-[44px] rounded-xl bg-zinc-200 dark:bg-zinc-800 text-xs font-semibold cursor-pointer"
+              >
+                {lang === 'am' ? 'ተመለስ' : 'Back'}
+              </button>
+              <button
+                type="submit"
+                className="flex-1 min-h-[44px] rounded-xl bg-purple-600 text-white text-xs font-semibold cursor-pointer"
+              >
+                {lang === 'am' ? 'አዲሱን Password አስቀምጥ' : 'Save New Password'}
+              </button>
+            </div>
+          </form>
+        )}
 
         {savedConfig && (
           <div className="pt-2 border-t border-zinc-100 dark:border-zinc-800 text-center">
             <button
               type="button"
               onClick={() => setConfirmReset(true)}
-              className="text-xs font-medium text-zinc-500 hover:text-purple-500 cursor-pointer"
+              className="text-xs font-medium text-zinc-500 hover:text-red-500 transition-colors cursor-pointer"
             >
-              {lang === 'am' ? 'PIN ረስተዋል? የግል መለያውን ዳግም ያስጀምሩ' : 'Forgot PIN? Reset Private Vault'}
+              {lang === 'am' ? 'የግል መለያውን ሙሉ በሙሉ አጥፋ (Reset Vault)' : 'Reset Entire Private Vault'}
             </button>
           </div>
         )}
@@ -159,19 +266,19 @@ export const PrivateGateScreen: React.FC<PrivateGateScreenProps> = ({
 
       <ConfirmModal
         open={confirmReset}
-        title={lang === 'am' ? 'የግል መለያውን ዳግም ማስጀመር?' : 'Reset Private Vault?'}
+        title={lang === 'am' ? 'የግል መለያው ዳግም ይጀመር?' : 'Reset Private Vault?'}
         description={
           lang === 'am'
-            ? 'የቀድሞ PIN እና የግል መለያ መረጃ ይጸዳል።'
-            : 'This clears your saved PIN and private history so you can set a new one.'
+            ? 'የቆየው የግል መለያና መልዕክቶች ይሰረዛሉ።'
+            : 'This clears your saved vault and private history so you can create a new one.'
         }
         confirmLabel={lang === 'am' ? 'ዳግም አስጀምር' : 'Reset'}
-        cancelLabel={lang === 'am' ? 'ተወው' : 'Cancel'}
+        cancelLabel={lang === 'am' ? 'ተመለስ' : 'Cancel'}
         danger={false}
         onConfirm={() => {
           setConfirmReset(false);
           setAlias('');
-          setPin('');
+          setPassword('');
           onResetVault();
         }}
         onCancel={() => setConfirmReset(false)}
