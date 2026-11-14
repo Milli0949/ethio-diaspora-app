@@ -245,6 +245,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                 <Heart className="w-5 h-5 fill-rose-500" />
               </div>
               <div>
+                <h2 className="text-lg font-bold text-zinc-900 dark:text-white">
                                   {authTab === 'login'
                     ? lang === 'am'
                       ? 'ወደ መለያዎ ይግቡ'
