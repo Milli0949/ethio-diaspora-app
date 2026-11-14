@@ -122,9 +122,7 @@ export default function App() {
   const [isCreatingNewProfile, setIsCreatingNewProfile] = useState(false);
 
   const [subTab, setSubTab] = useState<'people' | 'posts'>('people');
-  const [people, setPeople] = useState<PersonProfile[]>(() =>
-    readStorage<PersonProfile[]>(STORAGE_KEYS.people, INITIAL_PEOPLE)
-  );
+  const [people, setPeople] = useState<PersonProfile[]>([]);
     useEffect(() => {
     const q = query(collection(db, 'users'));
     const unsub = onSnapshot(q, (snap) => {
@@ -132,9 +130,7 @@ export default function App() {
         id: Number(doc.data().id) || Date.now(),
         ...doc.data(),
       })) as PersonProfile[];
-      if (firebaseUsers.length > 0) {
-        setPeople([...firebaseUsers, ...INITIAL_PEOPLE]);
-      }
+      setPeople(firebaseUsers);
     });
     return () => unsub();
   }, []);
