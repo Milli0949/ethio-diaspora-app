@@ -79,10 +79,10 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
   const [activeSlot, setActiveSlot] = useState<number>(0);
 
   const { isInstallable, isInstalled, isIOS, install } = usePWAInstall();
-  const appUrl =
+    const appUrl =
     typeof window !== 'undefined'
       ? `${window.location.origin}/`
-      : 'https://ais-pre-dcyaytah43paxhr7gkufyg-734391925648.us-east1.run.app/';
+      : 'https://netlify.app';
 
   const photoInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -96,10 +96,14 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
   };
 
   const handleNativeInstall = async () => {
-    const accepted = await install();
-    if (accepted) {
-      onNotify(lang === 'am' ? 'መተግበሪያው በመጫን ላይ ነው!' : 'Installing Fikir BeNetsa app!');
+    if (isInstallable) {
+      const accepted = await install();
+      if (accepted) {
+        onNotify(lang === 'am' ? 'መተግበሪያው በመጫን ላይ ነው...' : 'Installing Fikir BeNetsa...');
+        return;
+      }
     }
+    setShowInstallGuide(true);
   };
 
   const handlePhotoSlotClick = (idx: number) => {
