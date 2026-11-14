@@ -108,31 +108,30 @@ export const SelfieModal: React.FC<SelfieModalProps> = ({
   }, [open]);
 
   if (!open) return null;
-
-  const handleCaptureAndVerify = () => {
-    let snapshot: string | undefined;
-    if (streamReady && videoRef.current && videoRef.current.videoWidth > 0) {
-      const canvas = document.createElement('canvas');
-      canvas.width = 400;
-      canvas.height = 400;
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        ctx.drawImage(videoRef.current, 0, 0, 400, 400);
-        snapshot = canvas.toDataURL('image/jpeg', 0.8);
-      }
+    const handleCaptureAndVerify = () => {
+    if (!streamReady || !videoRef.current || !videoRef.current.videoWidth) {
+      return;
     }
+    const canvas = document.createElement('canvas');
+    canvas.width = 400;
+    canvas.height = 400;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.drawImage(videoRef.current, 0, 0, 400, 400);
+    const snapshot = canvas.toDataURL('image/jpeg', 0.8);
     onVerify(snapshot);
   };
 
   return (
     <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="w-full max-w-sm rounded-3xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-6 text-center">
+      <div className="w-full max-w-sm rounded-3xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 shadow-xl">
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-base font-semibold text-zinc-900 dark:text-white flex items-center gap-2">
+          <h3 className="text-base font-bold text-zinc-900 dark:text-white flex items-center gap-2">
             <Camera className="w-4 h-4 text-rose-500" />
-            {lang === 'am' ? 'የፊት ካሜራ ማረጋገጫ' : 'Selfie Verification'}
+            <span>{lang === 'am' ? 'የፊት ካሜራ ማረጋገጫ' : 'Live Selfie Verification'}</span>
           </h3>
           <button
+            type="button"
             onClick={onClose}
             aria-label="Close"
             className="w-9 h-9 rounded-full flex items-center justify-center text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer"
@@ -143,18 +142,18 @@ export const SelfieModal: React.FC<SelfieModalProps> = ({
 
         <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-4">
           {lang === 'am'
-            ? 'ትክክለኛ ሰው መሆንዎን ለማረጋገጥ ፊትዎን በክቡ ውስጥ ያስቀምጡ።'
-            : 'Center your face inside the circle to confirm your identity.'}
+            ? 'ከፕሮፋይል ፎቶዎ ጋር ለማመሳሰል ፊትዎን በክቡ ውስጥ አስገብተው ፎቶ ያንሱ (ካሜራ መፍቀድ ግዴታ ነው)።'
+            : 'Center your face inside the circle to match your profile photo (Camera permission required).'}
         </p>
 
-        <div className="mx-auto w-48 h-48 rounded-full overflow-hidden border-2 border-rose-500 bg-zinc-900 flex items-center justify-center mb-5">
+        <div className="mx-auto w-48 h-48 rounded-full overflow-hidden border-2 border-rose-500 bg-zinc-950 mb-5 flex items-center justify-center">
           {cameraError ? (
-            <div className="px-4 text-center">
-              <Camera className="w-9 h-9 text-zinc-500 mx-auto mb-2" />
-              <p className="text-xs text-zinc-400">
+            <div className="p-4 text-center">
+              <Camera className="w-9 h-9 text-rose-500 mx-auto mb-2" />
+              <p className="text-xs text-rose-400 font-medium">
                 {lang === 'am'
-                  ? 'ካሜራ አልተገኘም፤ ከታች "አረጋግጥ" የሚለውን ይጫኑ።'
-                  : 'Camera unavailable in this preview. Tap verify below to confirm.'}
+                  ? 'ካሜራው አልተከፈተም! እባክዎ የብራውዘርዎን Camera Permission ፈቅደው እንደገና ይሞክሩ።'
+                  : 'Camera blocked! Please allow browser camera permission to verify.'}
               </p>
             </div>
           ) : (
@@ -170,15 +169,22 @@ export const SelfieModal: React.FC<SelfieModalProps> = ({
 
         <div className="space-y-2.5">
           <button
+            type="button"
+            disabled={!streamReady || cameraError}
             onClick={handleCaptureAndVerify}
-            className="w-full min-h-[46px] rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-sm flex items-center justify-center gap-2 transition-colors cursor-pointer"
+            className={`w-full min-h-[46px] rounded-xl font-semibold text-sm flex items-center justify-center gap-2 transition-colors ${
+              streamReady && !cameraError
+                ? 'bg-emerald-600 hover:bg-emerald-500 text-white cursor-pointer'
+                : 'bg-zinc-300 dark:bg-zinc-800 text-zinc-500 cursor-not-allowed'
+            }`}
           >
             <CheckCircle2 className="w-4 h-4" />
-            {lang === 'am' ? 'አረጋግጥ (Verify Face)' : 'Verify Face'}
+            <span>{lang === 'am' ? 'ፎቶ አንሳ እና አረጋግጥ (Verify Face)' : 'Capture & Verify Face'}</span>
           </button>
           <button
+            type="button"
             onClick={onClose}
-            className="w-full min-h-[44px] rounded-xl bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 font-medium text-sm cursor-pointer"
+            className="w-full min-h-[44px] rounded-xl bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 font-medium text-sm cursor-pointer"
           >
             {lang === 'am' ? 'ዝጋ' : 'Cancel'}
           </button>
@@ -187,7 +193,6 @@ export const SelfieModal: React.FC<SelfieModalProps> = ({
     </div>
   );
 };
-
 interface ReportModalProps {
   targetName: string | null;
   lang: Lang;
