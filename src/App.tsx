@@ -610,17 +610,7 @@ export default function App() {
             setScreen('register');
           }
         }}
-            setIsLoggedIn(true);
-            if (user) {
-              setScreen('main');
-              showToast(
-                lang === 'am' ? `እንኳን ደህና መጡ፣ ${user.name}!` : `Welcome back, ${user.name}!`
-              );
-            } else {
-              setIsEditingProfile(false);
-              setScreen('register');
-            }
-          }}
+         
           onNotify={showToast}
         />
       </>
@@ -1114,10 +1104,7 @@ export default function App() {
           setIsLoggedIn(false);
           setScreen('login');
         }}
-                setIsLoggedIn(false);
-                setScreen('login');
-                showToast(lang === 'am' ? 'ከመለያዎ ወጥተዋል።' : 'Signed out');
-              }}
+              
               onRequestDeleteAccount={() => setConfirmDeleteOpen(true)}
               onNotify={showToast}
             />
