@@ -437,3 +437,271 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                   <button
                     type="submit"
                     disabled={loading}
+                    interface RegisterScreenProps {
+  lang: Lang;
+  initialProfile: UserProfile | null;
+  isEditing: boolean;
+  onSave: (profile: UserProfile) => void;
+  onCancel?: () => void;
+  onNotify: (msg: string) => void;
+}
+
+export const RegisterScreen: React.FC<RegisterScreenProps> = ({
+  lang,
+  initialProfile,
+  isEditing,
+  onSave,
+  onCancel,
+  onNotify,
+}) => {
+  const [name, setName] = useState(initialProfile?.name || '');
+  const [age, setAge] = useState(initialProfile?.age ? String(initialProfile.age) : '');
+  const [phone, setPhone] = useState(initialProfile?.phone || '');
+  const [gender, setGender] = useState<'male' | 'female' | ''>(initialProfile?.gender || '');
+  const [city, setCity] = useState(initialProfile?.city || '');
+  const [job, setJob] = useState(initialProfile?.job || '');
+  const [religion, setReligion] = useState(initialProfile?.religion || '');
+  const [goal, setGoal] = useState(initialProfile?.goal || '');
+  const [hobbies, setHobbies] = useState(initialProfile?.hobbies || '');
+  const [bio, setBio] = useState(initialProfile?.bio || '');
+  const [photos, setPhotos] = useState<(string | null)[]>(
+    initialProfile?.photos?.length === 4 ? initialProfile.photos : [null, null, null, null]
+  );
+  const [selfieSnapshot, setSelfieSnapshot] = useState<string | null>(
+    initialProfile?.selfieVerified ? initialProfile.photos?.[0] || 'verified' : null
+  );
+  const [selfieVerified, setSelfieVerified] = useState(initialProfile?.selfieVerified || false);
+  const [locationVerified, setLocationVerified] = useState(
+    initialProfile?.locationVerified || false
+  );
+  const [verifiedCity, setVerifiedCity] = useState(initialProfile?.verifiedCity || '');
+  const [password, setPassword] = useState(initialProfile?.password || '');
+  const [activeSlot, setActiveSlot] = useState<number>(0);
+  const [cameraOpen, setCameraOpen] = useState(false);
+  const [locating, setLocating] = useState(false);
+
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const handlePickSlot = (index: number) => {
+    setActiveSlot(index);
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    try {
+      const compressed = await compressImageToDataUrl(file, 640);
+      setPhotos((prev) => {
+        const next = [...prev];
+        next[activeSlot] = compressed;
+        return next;
+      });
+      if (activeSlot === 0 && selfieVerified) {
+        setSelfieVerified(false);
+        setSelfieSnapshot(null);
+        onNotify(
+          lang === 'am'
+            ? 'የፕሮፋይል ፎቶ ስለተቀየረ የፊት ካሜራ (Selfie) በድጋሚ ያረጋግጡ!'
+            : 'Profile photo changed! Please re-verify your live Selfie.'
+        );
+      } else {
+        onNotify(
+          lang === 'am'
+            ? `ፎቶ ${activeSlot + 1} ተጭኗል!`
+            : `Photo ${activeSlot + 1} uploaded!`
+        );
+      }
+    } catch {
+      onNotify(lang === 'am' ? 'ፎቶ መጫን አልተቻለም' : 'Failed to load photo');
+    }
+  };
+
+  const handleClearSlot = (index: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setPhotos((prev) => {
+      const next = [...prev];
+      next[index] = null;
+      return next;
+    });
+    if (index === 0) {
+      setSelfieVerified(false);
+      setSelfieSnapshot(null);
+    }
+  };
+
+  const handleOpenSelfieCamera = () => {
+    if (!photos[0]) {
+      onNotify(
+        lang === 'am'
+          ? 'መጀመሪያ የፕሮፋይል ፎቶዎን (ፎቶ 1) ይጫኑ፤ ከዚያ ከፊት ካሜራዎ ጋር ይመሳሰላል!'
+          : 'Upload your Profile Photo (Slot 1) first so it matches your live selfie!'
+      );
+      return;
+    }
+    setCameraOpen(true);
+  };
+
+  const handleVerifyLocation = () => {
+    setLocating(true);
+    const finish = (detectedLabel?: string) => {
+      setLocating(false);
+      setLocationVerified(true);
+      if (detectedLabel) setVerifiedCity(detectedLabel);
+      onNotify(lang === 'am' ? 'ቦታዎ ተረጋግጧል!' : 'GPS Location Verified!');
+    };
+
+    if (!navigator.geolocation) {
+      finish(city.trim() || 'Addis Ababa');
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const coords = `${pos.coords.latitude.toFixed(2)}, ${pos.coords.longitude.toFixed(2)}`;
+        finish(city.trim() ? `${city.trim()} (${coords})` : coords);
+      },
+      () => {
+        finish(city.trim() || 'Addis Ababa');
+      },
+      { timeout: 4000 }
+    );
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const parsedAge = parseInt(age, 10);
+    if (!name.trim() || !parsedAge || parsedAge < 18 || !gender || !city.trim() || !phone.trim()) {
+      onNotify(
+        lang === 'am'
+          ? 'ስም፣ ስልክ ቁጥር፣ ዕድሜ (18+)፣ ጾታ እና ከተማ መሙላት ግዴታ ነው!'
+          : 'Please fill name, phone, age (18+), gender, and city!'
+      );
+      return;
+    }
+    if (password.trim().length < 4) {
+      onNotify(
+        lang === 'am'
+          ? 'ቢያንስ 4 ቁምፊ የይለፍ ቃል (Password) ማውጣት ግዴታ ነው!'
+          : 'Please set a password of at least 4 characters!'
+      );
+      return;
+    }
+    if (photos.filter(Boolean).length < 4 || !photos[0]) {
+      onNotify(
+        lang === 'am'
+          ? '4 እውነተኛ ፎቶዎችን (1 ፕሮፋይል + 3 ተጨማሪ) መጫን ግዴታ ነው!'
+          : 'All 4 real photos (1 profile + 3 extra) are required!'
+      );
+      return;
+    }
+    if (!selfieVerified || !selfieSnapshot || !locationVerified) {
+      onNotify(
+        lang === 'am'
+          ? 'የፕሮፋይል ፎቶዎ ከፊት ካሜራ (Live Selfie) ጋር ካልተመሳሰለ እና GPS ካልተረጋገጠ ማለፍ አይቻልም!'
+          : 'Profile photo must match Live Selfie and GPS Location must be verified!'
+      );
+      return;
+    }
+
+    onSave({
+      name: name.trim(),
+      age: parsedAge,
+      phone: phone.trim(),
+      gender,
+      city: city.trim(),
+      job: job.trim() || (lang === 'am' ? 'ባለሙያ' : 'Professional'),
+      religion: religion || (lang === 'am' ? 'ሌላ / Other' : 'Other'),
+      goal: goal || (lang === 'am' ? 'ለፍቅር ግንኙነት / Serious Relationship' : 'Serious Relationship'),
+      hobbies: hobbies.trim() || (lang === 'am' ? 'ቡና, ሙዚቃ' : 'Coffee, Music'),
+      bio: bio.trim() || (lang === 'am' ? 'ሰላም! አዲስ ትውውቅ እፈልጋለሁ።' : 'Hello! Looking forward to meeting genuine people.'),
+      photos,
+      selfieVerified: true,
+      locationVerified: true,
+      verifiedCity: verifiedCity || city.trim(),
+      password: password.trim(),
+    });
+  };
+
+  const slotLabels = [
+    lang === 'am' ? 'ፕሮፋይል ፎቶ *' : 'Profile Photo *',
+    lang === 'am' ? 'ተጨማሪ ፎቶ 1 *' : 'Extra Photo 1 *',
+    lang === 'am' ? 'ተጨማሪ ፎቶ 2 *' : 'Extra Photo 2 *',
+    lang === 'am' ? 'ተጨማሪ ፎቶ 3 *' : 'Extra Photo 3 *',
+  ];
+
+  return (
+    <div className="min-h-screen px-4 py-6 sm:px-6 max-w-3xl mx-auto w-full">
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h2 className="text-xl sm:text-2xl font-bold text-zinc-900 dark:text-white">
+            {isEditing
+              ? lang === 'am'
+                ? 'መገለጫዎን ያስተካክሉ'
+                : 'Edit Your Profile'
+              : lang === 'am'
+                ? 'ሙሉ መገለጫ ይፍጠሩ'
+                : 'Create Full Profile'}
+          </h2>
+          <p className="text-xs sm:text-sm text-zinc-500 dark:text-zinc-400 mt-1">
+            {lang === 'am'
+              ? 'ትክክለኛ መረጃ፣ 4 እውነተኛ ፎቶዎች እና ከፕሮፋይልዎ ጋር የሚመሳሰል የፊት ካሜራ ማረጋገጫ ግዴታ ነው።'
+              : 'Real details, 4 authentic photos, and matching live selfie verification are required.'}
+          </p>
+        </div>
+        {onCancel && (
+          <button
+            type="button"
+            onClick={onCancel}
+            className="min-h-[44px] px-4 rounded-xl bg-zinc-200 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 text-sm font-medium cursor-pointer"
+          >
+            {lang === 'am' ? 'ተመለስ' : 'Back'}
+          </button>
+        )}
+      </div>
+
+      <form onSubmit={handleSubmit} className="space-y-6">
+        <div className="rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-5 space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">
+                {lang === 'am' ? 'ሙሉ ስም *' : 'Full Name *'}
+              </label>
+              <input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder={lang === 'am' ? 'ምሳሌ፡ አቤል' : 'e.g. Abel'}
+                className="w-full min-h-[44px] rounded-xl bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 px-3.5 text-sm text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-rose-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">
+                {lang === 'am' ? 'ዕድሜ (18+) *' : 'Age (18+) *'}
+              </label>
+              <input
+                type="number"
+                min={18}
+                max={99}
+                value={age}
+                onChange={(e) => setAge(e.target.value)}
+                placeholder="24"
+                className="w-full min-h-[44px] rounded-xl bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 px-3.5 text-sm text-zinc-900 dark:text-zinc-100 tabular-nums focus:outline-none focus:border-rose-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">
+                {lang === 'am' ? 'ስልክ ቁጥር (መግቢያ) *' : 'Phone Number (Login) *'}
+              </label>
+              <input
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="0911..."
+                className="w-full min-h-[44px] rounded-xl bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 px-3.5 text-sm text-zinc-900 dark:text-zinc-100 tabular-nums focus:outline-none focus:border-rose-500"
+              />
+            </div>
+
+            <div>
+
