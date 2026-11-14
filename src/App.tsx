@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from 'react';
+import { db } from './firebase';
+import { collection, addDoc, onSnapshot, query, orderBy } from 'firebase/firestore';
 import {
   Bell,
   Compass,
@@ -123,6 +125,19 @@ export default function App() {
   const [people, setPeople] = useState<PersonProfile[]>(() =>
     readStorage<PersonProfile[]>(STORAGE_KEYS.people, INITIAL_PEOPLE)
   );
+    useEffect(() => {
+    const q = query(collection(db, 'users'));
+    const unsub = onSnapshot(q, (snap) => {
+      const firebaseUsers = snap.docs.map((doc) => ({
+        id: Number(doc.data().id) || Date.now(),
+        ...doc.data(),
+      })) as PersonProfile[];
+      if (firebaseUsers.length > 0) {
+        setPeople([...firebaseUsers, ...INITIAL_PEOPLE]);
+      }
+    });
+    return () => unsub();
+  }, []);
   const [posts, setPosts] = useState<PostItem[]>(() =>
     readStorage<PostItem[]>(STORAGE_KEYS.posts, INITIAL_POSTS)
   );
@@ -619,6 +634,16 @@ export default function App() {
           initialProfile={isEditingProfile && !isCreatingNewProfile ? user : null}
           isEditing={isEditingProfile && !isCreatingNewProfile && Boolean(user)}
           onSave={(profile) => {
+                    addDoc(collection(db, 'users'), {
+          ...profile,
+          id: Date.now(),
+          likedByMe: false,
+          likedByThem: true,
+          isFriend: false,
+          online: true,
+          distance: lang === 'am' ? 'አዲስ ተመዝጋቢ' : 'New Member',
+          color: 'from-rose-500 to-pink-600'
+        }).catch(() => {});
             setUser(profile);
             setIsEditingProfile(false);
             setIsCreatingNewProfile(false);
