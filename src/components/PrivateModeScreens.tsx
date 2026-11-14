@@ -35,40 +35,6 @@ interface PrivateGateScreenProps {
   onResetVault: () => void;
   onNotify: (msg: string) => void;
 }
-
-export const PrivateGateScreen: React.FC<PrivateGateScreenProps> = ({
-  lang,
-  savedConfig,
-  onUnlock,
-  onResetVault,
-  onNotify,
-}) => {
-  const [alias, setAlias] = useState(savedConfig?.alias || '');
-  const [pin, setPin] = useState('');
-  const [confirmReset, setConfirmReset] = useState(false);
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const cleanedAlias = alias.trim();
-    const cleanedPin = pin.trim();
-
-    if (!cleanedAlias || cleanedPin.length < 4) {
-      onNotify(
-        lang === 'am'
-          ? 'የሚስጥር መጠሪያ ስም እና ባለ 4 አሃዝ PIN ያስገቡ!'
-          : 'Enter a private alias and 4-digit PIN!'
-      );
-      return;
-    }
-
-    if (savedConfig && savedConfig.pin !== cleanedPin) {
-      onNotify(
-        lang === 'am'
-          ? 'የተሳሳተ PIN ነው! እንደገና ይሞክሩ።'
-          : 'Incorrect PIN! Try again.'
-      );
-      return;
-    }
 export const PrivateGateScreen: React.FC<PrivateGateScreenProps> = ({
   lang,
   savedConfig,
