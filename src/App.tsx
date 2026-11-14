@@ -1003,7 +1003,6 @@ export default function App() {
               onNotify={showToast}
             />
           )}
-
           {screen === 'notifications' && (
             <NotificationsScreen
               lang={lang}
