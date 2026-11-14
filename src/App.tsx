@@ -23,18 +23,19 @@ import {
   SearchScreen,
   UserDetailScreen,
 } from './components/MainFeedScreens';
-import { ConfirmModal, MatchModal, ReportModal } from './components/Modals';
-import { PrivateGateScreen, PrivateWorkspace } from './components/PrivateModeScreens';
-import { SettingsScreen } from './components/SettingsScreen';
-import {
-  INITIAL_CONVERSATIONS,
-  INITIAL_NOTIFICATIONS,
-  INITIAL_PEOPLE,
-  INITIAL_POSTS,
-  INITIAL_PRIVATE_CHATS,
-  INITIAL_PRIVATE_NOTIFICATIONS,
-  INITIAL_PRIVATE_POSTS,
-  INITIAL_PRIVATE_USERS,
+  useEffect(() => {
+    const q = query(collection(db, 'users'));
+    const unsub = onSnapshot(q, (snap) => {
+      const firebaseUsers = snap.docs
+        .map((doc) => ({
+          id: Number(doc.data().id) || Date.now(),
+          ...doc.data(),
+        }))
+        .filter((u: any) => !user?.phone || u.phone !== user.phone) as PersonProfile[];
+      setPeople(firebaseUsers);
+    });
+    return () => unsub();
+  }, [user?.phone]);
 } from './data/seedData';
 import {
   AppNotification,
