@@ -598,7 +598,18 @@ export default function App() {
           existingUser={user}
           onToggleLang={toggleLang}
           onToggleTheme={toggleTheme}
-          onLoginSuccess={() => {
+                  onLoginSuccess={(matchedUser) => {
+          setIsLoggedIn(true);
+          if (matchedUser) {
+            setUser(matchedUser);
+            setScreen('main');
+            showToast(lang === 'am' ? `እንኳን ደህና መጡ፣ ${matchedUser.name}!` : `Welcome back, ${matchedUser.name}!`);
+          } else {
+            setUser(null);
+            setIsEditingProfile(false);
+            setScreen('register');
+          }
+        }}
             setIsLoggedIn(true);
             if (user) {
               setScreen('main');
@@ -1098,7 +1109,12 @@ export default function App() {
                   lang === 'am' ? 'የይለፍ ቃልዎ በተሳካ ሁኔታ ተቀይሯል!' : 'Password updated successfully!'
                 );
               }}
-              onLogout={() => {
+                      onLogout={() => {
+          localStorage.removeItem(STORAGE_KEYS.user);
+          setUser(null);
+          setIsLoggedIn(false);
+          setScreen('login');
+        }}
                 setIsLoggedIn(false);
                 setScreen('login');
                 showToast(lang === 'am' ? 'ከመለያዎ ወጥተዋል።' : 'Signed out');
