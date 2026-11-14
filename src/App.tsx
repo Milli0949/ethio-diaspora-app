@@ -23,19 +23,6 @@ import {
   SearchScreen,
   UserDetailScreen,
 } from './components/MainFeedScreens';
-  useEffect(() => {
-    const q = query(collection(db, 'users'));
-    const unsub = onSnapshot(q, (snap) => {
-      const firebaseUsers = snap.docs
-        .map((doc) => ({
-          id: Number(doc.data().id) || Date.now(),
-          ...doc.data(),
-        }))
-        .filter((u: any) => !user?.phone || u.phone !== user.phone) as PersonProfile[];
-      setPeople(firebaseUsers);
-    });
-    return () => unsub();
-  }, [user?.phone]);
 } from './data/seedData';
 import {
   AppNotification,
