@@ -245,7 +245,195 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                 <Heart className="w-5 h-5 fill-rose-500" />
               </div>
               <div>
-                <h2 className="text-lg font-bold text-zinc-900 dark:text-white">
-                  {authTab === 'login'
-                    ? lang === 'am' ? 'ወደ መለያዎ ይግቡ' : 'Login to Account'
+                                  {authTab === 'login'
+                    ? lang === 'am'
+                      ? 'ወደ መለያዎ ይግቡ'
+                      : 'Login to Account'
                     : authTab === 'register'
+                      ? lang === 'am'
+                        ? 'አዲስ መለያ ይፍጠሩ'
+                        : 'Create Account'
+                      : lang === 'am'
+                        ? 'የይለፍ ቃል ይቀይሩ'
+                        : 'Reset Password'}
+                </h2>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                  {authTab === 'login'
+                    ? lang === 'am'
+                      ? 'በስልክ ቁጥር እና በይለፍ ቃል ብቻ ይግቡ'
+                      : 'Sign in with phone & password'
+                    : authTab === 'register'
+                      ? lang === 'am'
+                        ? 'ነፃ መለያ ለመፍጠር ስልክዎን ያረጋግጡ'
+                        : 'Verify phone to create a free profile'
+                      : lang === 'am'
+                        ? 'የረሱትን የይለፍ ቃል በአዲስ ይተኩ'
+                        : 'Set a new account password'}
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-1.5 p-1 rounded-xl bg-zinc-100 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 mb-5">
+              <button
+                type="button"
+                onClick={() => setAuthTab('login')}
+                className={`min-h-[42px] rounded-lg text-xs font-bold cursor-pointer transition-colors ${
+                  authTab === 'login'
+                    ? 'bg-rose-600 text-white shadow-sm'
+                    : 'text-zinc-600 dark:text-zinc-400'
+                }`}
+              >
+                {lang === 'am' ? 'ግባ (Login)' : 'Login'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setAuthTab('register')}
+                className={`min-h-[42px] rounded-lg text-xs font-bold cursor-pointer transition-colors ${
+                  authTab === 'register'
+                    ? 'bg-rose-600 text-white shadow-sm'
+                    : 'text-zinc-600 dark:text-zinc-400'
+                }`}
+              >
+                {lang === 'am' ? 'ተመዝገብ (Create Account)' : 'Create Account'}
+              </button>
+            </div>
+
+            {authTab === 'login' && (
+              <form onSubmit={handlePasswordLogin} className="space-y-3.5">
+                <div>
+                  <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">
+                    {lang === 'am' ? 'የተመዘገበ ስልክ ቁጥር' : 'Registered Phone Number'}
+                  </label>
+                  <div className="relative">
+                    <Phone className="w-4 h-4 text-zinc-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      value={phoneInput}
+                      onChange={(e) => setPhoneInput(e.target.value)}
+                      placeholder="09..."
+                      className="w-full min-h-[44px] rounded-xl bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 pl-10 pr-3.5 text-sm text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-rose-500"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">
+                    {lang === 'am' ? 'የይለፍ ቃል (Password)' : 'Account Password'}
+                  </label>
+                  <div className="relative">
+                    <KeyRound className="w-4 h-4 text-zinc-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      value={passwordInput}
+                      onChange={(e) => setPasswordInput(e.target.value)}
+                      placeholder="••••••"
+                      className="w-full min-h-[44px] rounded-xl bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 pl-10 pr-10 text-sm text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-rose-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((v) => !v)}
+                      aria-label="Toggle password visibility"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-200 cursor-pointer"
+                    >
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => setAuthTab('reset')}
+                    className="text-xs font-medium text-rose-600 dark:text-rose-400 hover:underline cursor-pointer"
+                  >
+                    {lang === 'am' ? 'የይለፍ ቃል ረሱ? (Reset Password)' : 'Forgot / Reset Password?'}
+                  </button>
+                </div>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full min-h-[46px] rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-semibold text-sm transition-colors cursor-pointer"
+                >
+                  {loading
+                    ? lang === 'am'
+                      ? 'በመግባት ላይ...'
+                      : 'Logging in...'
+                    : lang === 'am'
+                      ? 'በይለፍ ቃል ግባ'
+                      : 'Login with Password'}
+                </button>
+              </form>
+            )}
+
+            {authTab === 'register' && (
+              <>
+                <form onSubmit={handleSendOtp} className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">
+                      {lang === 'am' ? 'አዲስ ስልክ ቁጥር' : 'New Phone Number'}
+                    </label>
+                    <input
+                      type="text"
+                      value={contact}
+                      onChange={(e) => setContact(e.target.value)}
+                      placeholder="09..."
+                      className="w-full min-h-[44px] rounded-xl bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 px-3.5 py-2.5 text-sm text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-rose-500"
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    className="w-full min-h-[46px] rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-semibold text-sm transition-colors cursor-pointer"
+                  >
+                    {lang === 'am' ? 'ኮድ ላክ (Send OTP)' : 'Send OTP Code'}
+                  </button>
+                </form>
+
+                {sentOtp && (
+                  <form
+                    onSubmit={handleVerifyOtp}
+                    className="mt-5 pt-5 border-t border-zinc-200 dark:border-zinc-800 space-y-3"
+                  >
+                    <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/30 px-3.5 py-2.5 text-center">
+                      <span className="text-xs font-medium text-emerald-700 dark:text-emerald-300">
+                        {lang === 'am' ? 'የእርስዎ OTP ኮድ፡ ' : 'Your OTP Code: '}
+                      </span>
+                      <span className="font-mono font-bold text-sm text-emerald-600 dark:text-emerald-400 tabular-nums">
+                        {sentOtp}
+                      </span>
+                    </div>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      maxLength={6}
+                      value={codeInput}
+                      onChange={(e) => setCodeInput(e.target.value)}
+                      placeholder={lang === 'am' ? 'ባለ 6 አሃዝ ኮድ' : '6-Digit Code'}
+                      className="w-full min-h-[44px] rounded-xl bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 px-3.5 py-2.5 text-sm text-zinc-900 dark:text-zinc-100 text-center tracking-widest font-mono tabular-nums focus:outline-none focus:border-emerald-500"
+                    />
+                    <button
+                      type="submit"
+                      className="w-full min-h-[46px] rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-sm transition-colors cursor-pointer"
+                    >
+                      {lang === 'am' ? 'አረጋግጥ እና መዝገብ ቀጥል' : 'Verify & Continue to Register'}
+                    </button>
+                  </form>
+                )}
+              </>
+            )}
+
+            {authTab === 'reset' && (
+              <div className="space-y-3.5">
+                <form onSubmit={handleSendResetOtp} className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">
+                      {lang === 'am' ? 'የተመዘገበ ስልክ ቁጥርዎ' : 'Your Registered Phone'}
+                    </label>
+                    <input
+                      type="text"
+                      value={resetPhone}
+                      onChange={(e) => setResetPhone(e.target.value)}
+                      placeholder="09..."
+                      className="w-full min-h-[44px] rounded-xl bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 px-3.5 text-sm text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-rose-500"
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={loading}
