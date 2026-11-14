@@ -389,47 +389,21 @@ export default function App() {
       [personId]: [...(prev[personId] || []), outgoing],
     }));
 
-    const recipient = people.find((p) => p.id === personId);
-    setTimeout(() => {
-      const replyText =
-        lang === 'am'
-          ? `መልእክትዎን አይቼዋለሁ ${user?.name || ''}! 😊 ደስ ይላል።`
-          : `Got your message${user?.name ? `, ${user.name}` : ''}! 😊 Looking forward to chatting more.`;
-      setConversations((prev) => ({
-        ...prev,
-        [personId]: [
-          ...(prev[personId] || []),
-          {
-            id: Date.now() + 1,
-            from: 'in',
-            text: replyText,
-            status: 'seen',
-            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          },
-        ],
-      }));
-      if (screen !== 'chat') {
-        setUnreadChatCount((c) => c + 1);
-      }
-      if (recipient) {
-        setNotifications((prev) => [
-          {
-            id: Date.now() + 2,
-            type: 'comment',
-            personId: recipient.id,
-            personName: `${recipient.name}, ${recipient.age}`,
-            avatarColor: recipient.color,
-            messageAm: 'አዲስ መልእክት ልኮልዎታል።',
-            messageEn: 'Sent you a new message.',
-            time: lang === 'am' ? 'አሁን' : 'Now',
-            read: screen === 'chat',
-          },
-          ...prev,
-        ]);
-      }
-    }, 900);
-  };
-
+        const recipient = people.find((p) => p.id === personId) as any;
+    if (user?.phone && recipient?.phone) {
+      addDoc(collection(db, 'messages'), {
+        id: outgoing.id,
+        fromPhone: user.phone,
+        fromId: (user as any).id || Date.now(),
+        toPhone: recipient.phone,
+        toId: recipient.id,
+        text,
+        replyTo: replyTo || null,
+        file: file || null,
+        time: nowTime,
+      }).catch(() => {});
+    }
+  }
   const handleBlockPerson = (personId: number) => {
     setBlockedIds((prev) => (prev.includes(personId) ? prev : [...prev, personId]));
     showToast(lang === 'am' ? 'ተጠቃሚው ታግዷል!' : 'User blocked!');
