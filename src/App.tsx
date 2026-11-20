@@ -1,1150 +1,620 @@
-import React, { useEffect, useState } from 'react';
-import { db } from './firebase';
-import { collection, addDoc, onSnapshot, query, orderBy } from 'firebase/firestore';
-import {
-  Bell,
-  Compass,
-  Heart,
-  Lock,
-  MessageCircle,
-  Moon,
-  Search,
-  Settings,
-  Sun,
-  WifiOff,
-} from 'lucide-react';
-import { LoginScreen, RegisterScreen } from './components/AuthScreens';
-import { useOnlineStatus } from './hooks/usePWAInstall';
-import { Avatar } from './components/Avatar';
-import { ChatScreen, NotificationsScreen } from './components/ChatAndNotifScreens';
-import {
-  DiscoveryAndPostsScreen,
-  MatchesScreen,
-  SearchScreen,
-  UserDetailScreen,
-} from './components/MainFeedScreens';
-} from './data/seedData';
-import {
-  AppNotification,
-  ChatMessage,
-  Lang,
-  MainScreen,
-  MediaAttachment,
-  MessagePrivacy,
-  PersonProfile,
-  PostItem,
-  PrivateAccountConfig,
-  PrivateNotification,
-  PrivatePost,
-  PrivateScreen,
-  PrivateUser,
-  Theme,
-  UserProfile,
-} from './types/app';
+import { FormEvent, useEffect, useState } from 'react';
+import { ArrowLeft, ArrowRight, Heart, LogOut, MessageCircle, Send, ShieldCheck } from 'lucide-react';
+import { User } from '@supabase/supabase-js';
+import { supabase } from './supabase';
 
-const STORAGE_KEYS = {
-  user: 'fb_user_v2',
-  lang: 'fb_lang_v2',
-  theme: 'fb_theme_v2',
-  msgPrivacy: 'fb_mp_v2',
-  people: 'fb_people_v2',
-  posts: 'fb_posts_v2',
-  chats: 'fb_chats_v2',
-  notifs: 'fb_notifs_v2',
-  blocked: 'fb_blocked_v2',
-  privateConfig: 'fb_prv_cfg_v2',
-  privatePosts: 'fb_prv_posts_v2',
-  privateChats: 'fb_prv_chats_v2',
+type Section = 'discover' | 'community' | 'messages' | 'profile' | 'preferences' | 'verification' | 'membership';
+type Profile = {
+  id: string;
+  display_name: string;
+  age: number | null;
+  gender: string | null;
+  city: string | null;
+  country: string | null;
+  bio: string;
+  faith: string | null;
+  languages: string[];
+  intent: string | null;
+  avatar_url: string | null;
+  is_visible: boolean;
 };
+type Preferences = {
+  user_id: string;
+  min_age: number;
+  max_age: number;
+  location: string | null;
+  faith: string | null;
+  languages: string[];
+  intents: string[];
+};
+type Comment = { id: string; post_id: string; author_id: string; body: string; created_at: string };
+type Post = {
+  id: string;
+  author_id: string;
+  body: string;
+  topic: string;
+  visibility: 'public' | 'matches';
+  created_at: string;
+  comments: Comment[];
+  author_name: string;
+};
+type Match = {
+  id: string;
+  user_low: string;
+  user_high: string;
+  created_at: string;
+  partner: Profile | null;
+  messages: Message[];
+};
+type Message = { id: string; match_id: string; sender_id: string; body: string; created_at: string };
+type Verification = { id: string; status: 'pending' | 'verified' | 'rejected'; submitted_at: string };
+type Subscription = { id: string; plan_key: string; status: string; created_at: string };
 
-function readStorage<T>(key: string, fallback: T): T {
-  try {
-    const raw = localStorage.getItem(key);
-    if (!raw) return fallback;
-    return JSON.parse(raw) as T;
-  } catch {
-    return fallback;
-  }
+const sections: { id: Section; label: string }[] = [
+  { id: 'discover', label: 'Discover' },
+  { id: 'community', label: 'Community' },
+  { id: 'messages', label: 'Messages' },
+  { id: 'profile', label: 'Profile' },
+  { id: 'preferences', label: 'Preferences' },
+  { id: 'verification', label: 'Verification' },
+  { id: 'membership', label: 'Membership' },
+];
+
+function messageOf(error: unknown) {
+  return error instanceof Error ? error.message : String(error);
 }
 
-export default function App() {
-  const [lang, setLang] = useState<Lang>(() => readStorage<Lang>(STORAGE_KEYS.lang, 'am'));
-  const [theme, setTheme] = useState<Theme>(() => readStorage<Theme>(STORAGE_KEYS.theme, 'dark'));
-
-  const [user, setUser] = useState<UserProfile | null>(() => {
-    const stored = readStorage<UserProfile | null>(STORAGE_KEYS.user, null);
-    if (stored) return stored;
-    // Migrate legacy fb_u if present
-    try {
-      const legacy = localStorage.getItem('fb_u');
-      if (legacy) {
-        const parsed = JSON.parse(legacy);
-        if (parsed?.n) {
-          return {
-            name: parsed.n,
-            age: Number(parsed.a) || 22,
-            phone: parsed.p || '',
-            gender: parsed.g === 'ሴት' ? 'female' : 'male',
-            city: parsed.c || 'Addis Ababa',
-            job: parsed.j || '',
-            religion: parsed.r || '',
-            goal: parsed.gl || '',
-            hobbies: parsed.h || '',
-            bio: parsed.b || '',
-            photos: Array.isArray(parsed.ph) ? parsed.ph : [null, null, null, null],
-            selfieVerified: true,
-            locationVerified: true,
-          };
-        }
-      }
-    } catch {
-      // ignore legacy parse error
-    }
-    return null;
-  });
-
-  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(() => Boolean(user));
-  const [screen, setScreen] = useState<MainScreen>(() => (user ? 'main' : 'login'));
-  const [previousScreen, setPreviousScreen] = useState<MainScreen>('main');
-  const [isEditingProfile, setIsEditingProfile] = useState(false);
-  const [isCreatingNewProfile, setIsCreatingNewProfile] = useState(false);
-
-  const [subTab, setSubTab] = useState<'people' | 'posts'>('people');
-  const [people, setPeople] = useState<PersonProfile[]>([]);
-    useEffect(() => {
-    const q = query(collection(db, 'users'));
-    const unsub = onSnapshot(q, (snap) => {
-      const firebaseUsers = snap.docs.map((doc) => ({
-        id: Number(doc.data().id) || Date.now(),
-        ...doc.data(),
-      })) as PersonProfile[];
-      setPeople(firebaseUsers);
-    });
-    return () => unsub();
-  }, []);
-  const [posts, setPosts] = useState<PostItem[]>(() =>
-    readStorage<PostItem[]>(STORAGE_KEYS.posts, INITIAL_POSTS)
-  );
-  const [conversations, setConversations] = useState<Record<number, ChatMessage[]>>(() =>
-    readStorage<Record<number, ChatMessage[]>>(STORAGE_KEYS.chats, INITIAL_CONVERSATIONS)
-  );
-  const [notifications, setNotifications] = useState<AppNotification[]>(() =>
-    readStorage<AppNotification[]>(STORAGE_KEYS.notifs, INITIAL_NOTIFICATIONS)
-  );
-  const [blockedIds, setBlockedIds] = useState<number[]>(() =>
-    readStorage<number[]>(STORAGE_KEYS.blocked, [])
-  );
-  const [messagePrivacy, setMessagePrivacy] = useState<MessagePrivacy>(() =>
-    readStorage<MessagePrivacy>(STORAGE_KEYS.msgPrivacy, 'all')
-  );
-
-  const [selectedPersonId, setSelectedPersonId] = useState<number>(1);
-  const [activeChatPersonId, setActiveChatPersonId] = useState<number>(1);
-  const [unreadChatCount, setUnreadChatCount] = useState<number>(1);
-
-  const [matchModalPerson, setMatchModalPerson] = useState<PersonProfile | null>(null);
-  const [reportTargetName, setReportTargetName] = useState<string | null>(null);
-  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
-
-  // Private mode state
-  const [privateConfig, setPrivateConfig] = useState<PrivateAccountConfig | null>(() =>
-    readStorage<PrivateAccountConfig | null>(STORAGE_KEYS.privateConfig, null)
-  );
-  const [privateUnlocked, setPrivateUnlocked] = useState(false);
-  const [privateScreen, setPrivateScreen] = useState<PrivateScreen>('p-main');
-  const [privateUsers] = useState<PrivateUser[]>(INITIAL_PRIVATE_USERS);
-  const [privatePosts, setPrivatePosts] = useState<PrivatePost[]>(() =>
-    readStorage<PrivatePost[]>(STORAGE_KEYS.privatePosts, INITIAL_PRIVATE_POSTS)
-  );
-  const [privateChats, setPrivateChats] = useState<Record<string, ChatMessage[]>>(() =>
-    readStorage<Record<string, ChatMessage[]>>(STORAGE_KEYS.privateChats, INITIAL_PRIVATE_CHATS)
-  );
-  const [privateNotifs, setPrivateNotifs] = useState<PrivateNotification[]>(
-    INITIAL_PRIVATE_NOTIFICATIONS
-  );
-  const [activePrivateUserId, setActivePrivateUserId] = useState<string>('mystery_18');
-
-  const [toast, setToast] = useState<string | null>(null);
-  const isOnline = useOnlineStatus();
-
-  const showToast = (msg: string) => {
-    setToast(msg);
+function emptyProfile(id: string): Profile {
+  return {
+    id, display_name: '', age: null, gender: null, city: null, country: null,
+    bio: '', faith: null, languages: [], intent: null, avatar_url: null, is_visible: true,
   };
+}
+
+function App() {
+  const [user, setUser] = useState<User | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [dataLoading, setDataLoading] = useState(false);
+  const [section, setSection] = useState<Section>('discover');
+  const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+  const [authMode, setAuthMode] = useState<'sign-in' | 'sign-up'>('sign-in');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [authName, setAuthName] = useState('');
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [preferences, setPreferences] = useState<Preferences | null>(null);
+  const [candidates, setCandidates] = useState<Profile[]>([]);
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [matches, setMatches] = useState<Match[]>([]);
+  const [verifications, setVerifications] = useState<Verification[]>([]);
+  const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
+  const [swiping, setSwiping] = useState(false);
+  const [postBody, setPostBody] = useState('');
+  const [postTopic, setPostTopic] = useState('community');
+  const [postVisibility, setPostVisibility] = useState<'public' | 'matches'>('public');
+  const [commentDrafts, setCommentDrafts] = useState<Record<string, string>>({});
+  const [activeMatchId, setActiveMatchId] = useState('');
+  const [messageBody, setMessageBody] = useState('');
+  const [ageConfirmed, setAgeConfirmed] = useState(false);
+  const [identityDocument, setIdentityDocument] = useState<File | null>(null);
+  const [verificationSubmitting, setVerificationSubmitting] = useState(false);
+  const [planKey, setPlanKey] = useState('plus_monthly');
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const currentUrl = window.location.origin + window.location.pathname;
-    const canonical = document.querySelector('link[rel="canonical"]');
-    if (canonical) canonical.setAttribute('href', currentUrl);
-    const ogUrl = document.querySelector('meta[property="og:url"]');
-    if (ogUrl) ogUrl.setAttribute('content', currentUrl);
-  }, []);
-
-  useEffect(() => {
-    if (!toast) return;
-    const timer = setTimeout(() => setToast(null), 2600);
-    return () => clearTimeout(timer);
-  }, [toast]);
-
-  // Sync theme on <html>
-  useEffect(() => {
-    const root = document.documentElement;
-    if (theme === 'dark') {
-      root.classList.add('dark');
-    } else {
-      root.classList.remove('dark');
-    }
-    try {
-      localStorage.setItem(STORAGE_KEYS.theme, JSON.stringify(theme));
-    } catch {
-      // ignore storage errors
-    }
-  }, [theme]);
-
-  useEffect(() => {
-    document.documentElement.lang = lang;
-    try {
-      localStorage.setItem(STORAGE_KEYS.lang, JSON.stringify(lang));
-    } catch {}
-  }, [lang]);
-
-  useEffect(() => {
-    try {
-      if (user) {
-        localStorage.setItem(STORAGE_KEYS.user, JSON.stringify(user));
-      } else {
-        localStorage.removeItem(STORAGE_KEYS.user);
-      }
-    } catch {}
-  }, [user]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEYS.people, JSON.stringify(people));
-    } catch {}
-  }, [people]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEYS.posts, JSON.stringify(posts));
-    } catch {}
-  }, [posts]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEYS.chats, JSON.stringify(conversations));
-    } catch {}
-  }, [conversations]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEYS.notifs, JSON.stringify(notifications));
-    } catch {}
-  }, [notifications]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEYS.blocked, JSON.stringify(blockedIds));
-    } catch {}
-  }, [blockedIds]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEYS.msgPrivacy, JSON.stringify(messagePrivacy));
-    } catch {}
-  }, [messagePrivacy]);
-
-  useEffect(() => {
-    try {
-      if (privateConfig) {
-        localStorage.setItem(STORAGE_KEYS.privateConfig, JSON.stringify(privateConfig));
-      } else {
-        localStorage.removeItem(STORAGE_KEYS.privateConfig);
-      }
-    } catch {}
-  }, [privateConfig]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEYS.privatePosts, JSON.stringify(privatePosts));
-    } catch {}
-  }, [privatePosts]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEYS.privateChats, JSON.stringify(privateChats));
-    } catch {}
-  }, [privateChats]);
-
-  const toggleTheme = () => setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
-  const toggleLang = () => {
-    setLang((prev) => {
-      const next = prev === 'am' ? 'en' : 'am';
-      showToast(next === 'am' ? 'ቋንቋ ወደ አማርኛ ተቀይሯል' : 'Language switched to English');
-      return next;
-    });
-  };
-
-  const navigateTo = (target: MainScreen) => {
-    if (target !== 'detail') {
-      setPreviousScreen(screen === 'detail' ? previousScreen : screen);
-    }
-    setScreen(target);
-    if (target === 'chat') {
-      setUnreadChatCount(0);
-    }
-  };
-
-  const handleToggleFriend = (personId: number) => {
-    setPeople((prev) =>
-      prev.map((p) => {
-        if (p.id !== personId) return p;
-        const nextFriend = !p.isFriend;
-        showToast(
-          nextFriend
-            ? lang === 'am'
-              ? `${p.name} ጓደኛዎ ሆኗል/ሆናለች`
-              : `Added ${p.name} as friend`
-            : lang === 'am'
-              ? `ከ${p.name} ጓደኝነት ተቋርጧል`
-              : `Removed ${p.name} from friends`
-        );
-        return { ...p, isFriend: nextFriend };
-      })
-    );
-  };
-
-  const handleLikePerson = (personId: number) => {
-    const target = people.find((p) => p.id === personId);
-    if (!target) return;
-
-    const nextLiked = !target.likedByMe;
-    setPeople((prev) =>
-      prev.map((p) => (p.id === personId ? { ...p, likedByMe: nextLiked } : p))
-    );
-
-    if (nextLiked && target.likedByThem) {
-      setMatchModalPerson({ ...target, likedByMe: true });
-      setNotifications((prev) => [
-        {
-          id: Date.now(),
-          type: 'match',
-          personId: target.id,
-          personName: `${target.name}, ${target.age}`,
-          avatarColor: target.color,
-          messageAm: 'አዲስ ግጥምጥሞሽ (It’s a Match!) — አሁን ማውራት ይችላሉ።',
-          messageEn: 'New mutual match! You can message each other now.',
-          time: lang === 'am' ? 'አሁን' : 'Now',
-          read: false,
-        },
-        ...prev,
-      ]);
-    } else if (nextLiked) {
-      showToast(lang === 'am' ? `${target.name}ን ወደዋል ❤` : `Liked ${target.name} ❤`);
-    }
-  };
-
-  const handleOpenChat = (personId: number) => {
-    const target = people.find((p) => p.id === personId);
-    if (!target) return;
-    if (messagePrivacy === 'none') {
-      showToast(
-        lang === 'am'
-          ? 'መልእክቶች ተቆልፈዋል (Settings ውስጥ ይክፈቱ)!'
-          : 'Messages are locked in Settings!'
-      );
+    if (!supabase) {
+      setAuthLoading(false);
       return;
     }
-    if (messagePrivacy === 'friends' && !target.isFriend) {
-      showToast(
-        lang === 'am'
-          ? 'ለጓደኞች ብቻ የተፈቀደ ነው — መጀመሪያ ጓደኛ ያድርጉ!'
-          : 'Friends only — add as friend first!'
-      );
-      return;
-    }
-    setActiveChatPersonId(personId);
-    navigateTo('chat');
-  };
 
-  const handleSendMessage = (
-    personId: number,
-    text: string,
-    replyTo?: string,
-    file?: MediaAttachment
-  ) => {
-    const nowTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    const outgoing: ChatMessage = {
-      id: Date.now(),
-      from: 'out',
-      text,
-      replyTo,
-      file,
-      status: 'seen',
-      time: nowTime,
+    let active = true;
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+      setAuthLoading(false);
+    });
+
+    void supabase.auth.getSession().then(({ data, error: sessionError }) => {
+      if (!active) return;
+      if (sessionError) setError(sessionError.message);
+      setUser(data.session?.user ?? null);
+      setAuthLoading(false);
+    });
+
+    return () => {
+      active = false;
+      subscription.unsubscribe();
     };
+  }, []);
 
-    setConversations((prev) => ({
-      ...prev,
-      [personId]: [...(prev[personId] || []), outgoing],
-    }));
+  useEffect(() => {
+    if (!user || !supabase) {
+      setProfile(null);
+      setPreferences(null);
+      setCandidates([]);
+      setPosts([]);
+      setMatches([]);
+      setVerifications([]);
+      setSubscriptions([]);
+      setActiveMatchId('');
+      return;
+    }
 
-        const recipient = people.find((p) => p.id === personId) as any;
-    if (user?.phone && recipient?.phone) {
-      addDoc(collection(db, 'messages'), {
-        id: outgoing.id,
-        fromPhone: user.phone,
-        fromId: (user as any).id || Date.now(),
-        toPhone: recipient.phone,
-        toId: recipient.id,
-        text,
-        replyTo: replyTo || null,
-        file: file || null,
-        time: nowTime,
-      }).catch(() => {});
+    let active = true;
+    setDataLoading(true);
+    setError('');
+    setProfile(null);
+    setPreferences(null);
+    setCandidates([]);
+    setPosts([]);
+    setMatches([]);
+    setVerifications([]);
+    setSubscriptions([]);
+    setActiveMatchId('');
+
+    async function loadWorkspace() {
+      const [
+        profileResult,
+        preferencesResult,
+        candidateResult,
+        swipeResult,
+        postResult,
+        matchResult,
+        verificationResult,
+        subscriptionResult,
+      ] = await Promise.all([
+        supabase!.from('profiles').select('*').eq('id', user!.id).maybeSingle(),
+        supabase!.from('match_preferences').select('*').eq('user_id', user!.id).maybeSingle(),
+        supabase!.from('profiles').select('*').eq('is_visible', true).neq('id', user!.id).order('created_at', { ascending: false }),
+        supabase!.from('swipes').select('target_id').eq('swiper_id', user!.id),
+        supabase!.from('posts').select('*').order('created_at', { ascending: false }).limit(50),
+        supabase!.from('matches').select('*').or(`user_low.eq.${user!.id},user_high.eq.${user!.id}`).order('created_at', { ascending: false }),
+        supabase!.from('verifications').select('id,status,submitted_at').eq('user_id', user!.id).order('submitted_at', { ascending: false }),
+        supabase!.from('subscriptions').select('id,plan_key,status,created_at').eq('user_id', user!.id).order('created_at', { ascending: false }),
+      ]);
+
+      for (const result of [profileResult, preferencesResult, candidateResult, swipeResult, postResult, matchResult, verificationResult, subscriptionResult]) {
+        if (result.error) throw result.error;
+      }
+
+      const savedProfile = (profileResult.data as Profile | null) ?? emptyProfile(user!.id);
+      const savedPreferences = preferencesResult.data as Preferences | null;
+      const candidateRows = (candidateResult.data ?? []) as Profile[];
+      const swipedIds = new Set((swipeResult.data ?? []).map((swipe) => swipe.target_id));
+      const postRows = (postResult.data ?? []) as Omit<Post, 'comments' | 'author_name'>[];
+      const matchRows = (matchResult.data ?? []) as Omit<Match, 'partner' | 'messages'>[];
+      const [commentsResult, messagesResult] = await Promise.all([
+        postRows.length
+          ? supabase!.from('post_comments').select('*').in('post_id', postRows.map((post) => post.id))
+          : Promise.resolve({ data: [], error: null }),
+        matchRows.length
+          ? supabase!.from('messages').select('*').in('match_id', matchRows.map((match) => match.id)).order('created_at', { ascending: true })
+          : Promise.resolve({ data: [], error: null }),
+      ]);
+      if (commentsResult.error) throw commentsResult.error;
+      if (messagesResult.error) throw messagesResult.error;
+      const commentRows = (commentsResult.data ?? []) as Comment[];
+      const messageRows = (messagesResult.data ?? []) as Message[];
+
+      const partnerIds = matchRows.map((match) => match.user_low === user!.id ? match.user_high : match.user_low);
+      const referencedProfileIds = [...new Set([
+        ...postRows.map((post) => post.author_id),
+        ...commentRows.map((comment) => comment.author_id),
+        ...partnerIds,
+      ])].filter((id) => id !== user!.id);
+      const referencedProfiles = referencedProfileIds.length
+        ? await supabase!.from('profiles').select('*').in('id', referencedProfileIds)
+        : { data: [], error: null };
+      if (referencedProfiles.error) throw referencedProfiles.error;
+
+      const profilesById = new Map<string, Profile>([
+        [savedProfile.id, savedProfile],
+        ...candidateRows.map((candidate) => [candidate.id, candidate] as [string, Profile]),
+        ...((referencedProfiles.data ?? []) as Profile[]).map((person) => [person.id, person] as [string, Profile]),
+      ]);
+      const commentsByPost = new Map<string, Comment[]>();
+      for (const comment of commentRows) commentsByPost.set(comment.post_id, [...(commentsByPost.get(comment.post_id) ?? []), comment]);
+
+      const nextPosts: Post[] = postRows.map((post) => ({
+        ...post,
+        comments: commentsByPost.get(post.id) ?? [],
+        author_name: profilesById.get(post.author_id)?.display_name || 'Member',
+      }));
+      const nextMatches: Match[] = matchRows.map((match) => {
+        const partnerId = match.user_low === user!.id ? match.user_high : match.user_low;
+        return {
+          ...match,
+          partner: profilesById.get(partnerId) ?? null,
+          messages: messageRows.filter((message) => message.match_id === match.id),
+        };
+      });
+
+      if (!active) return;
+      setProfile(savedProfile);
+      const currentPreferences = savedPreferences ?? {
+        user_id: user!.id, min_age: 18, max_age: 99, location: null, faith: null, languages: [], intents: [],
+      };
+      setPreferences(currentPreferences);
+      setCandidates(candidateRows.filter((candidate) => {
+        if (swipedIds.has(candidate.id) || candidate.age === null
+          || candidate.age < currentPreferences.min_age || candidate.age > currentPreferences.max_age) return false;
+        if (currentPreferences.faith && candidate.faith !== currentPreferences.faith) return false;
+        if (currentPreferences.location
+          && ![candidate.city, candidate.country].some((value) => value?.toLowerCase() === currentPreferences.location?.toLowerCase())) return false;
+        if (currentPreferences.languages.length
+          && !currentPreferences.languages.some((language) => candidate.languages?.includes(language))) return false;
+        if (currentPreferences.intents.length && !currentPreferences.intents.includes(candidate.intent ?? '')) return false;
+        return true;
+      }));
+      setPosts(nextPosts);
+      setMatches(nextMatches);
+      setVerifications((verificationResult.data ?? []) as Verification[]);
+      setSubscriptions((subscriptionResult.data ?? []) as Subscription[]);
+      setActiveMatchId(nextMatches[0]?.id ?? '');
+    }
+
+    void loadWorkspace()
+      .catch((loadError: unknown) => { if (active) setError(messageOf(loadError)); })
+      .finally(() => { if (active) setDataLoading(false); });
+
+    return () => { active = false; };
+  }, [user?.id]);
+
+  async function run(action: () => Promise<void>, success?: string) {
+    setError('');
+    setNotice('');
+    try {
+      await action();
+      if (success) setNotice(success);
+    } catch (actionError) {
+      setError(messageOf(actionError));
     }
   }
-  const handleBlockPerson = (personId: number) => {
-    setBlockedIds((prev) => (prev.includes(personId) ? prev : [...prev, personId]));
-    showToast(lang === 'am' ? 'ተጠቃሚው ታግዷል!' : 'User blocked!');
-    if (screen === 'detail' || screen === 'chat') {
-      navigateTo('main');
+
+  async function submitAuth(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!supabase) return;
+    await run(async () => {
+      if (authMode === 'sign-up') {
+        const { data, error: signUpError } = await supabase!.auth.signUp({
+          email: email.trim(),
+          password,
+          options: { data: { display_name: authName.trim() } },
+        });
+        if (signUpError) throw signUpError;
+        if (!data.session) setNotice('Check your email to confirm your account, then sign in.');
+      } else {
+        const { error: signInError } = await supabase!.auth.signInWithPassword({ email: email.trim(), password });
+        if (signInError) throw signInError;
+      }
+    });
+  }
+
+  async function refreshAfterWrite(success: string) {
+    setNotice(success);
+    if (user) {
+      const { data, error: resultError } = await supabase!.from('profiles').select('*').eq('id', user.id).single();
+      if (resultError) throw resultError;
+      setProfile(data as Profile);
     }
-  };
-
-  const handleDeleteAccount = () => {
-    setConfirmDeleteOpen(false);
-    localStorage.clear();
-    setUser(null);
-    setIsLoggedIn(false);
-    setIsEditingProfile(false);
-    setPrivateUnlocked(false);
-    setPrivateConfig(null);
-    setPeople(INITIAL_PEOPLE);
-    setPosts(INITIAL_POSTS);
-    setConversations(INITIAL_CONVERSATIONS);
-    setNotifications(INITIAL_NOTIFICATIONS);
-    setBlockedIds([]);
-    setScreen('login');
-    showToast(lang === 'am' ? 'መለያዎ ተሰርዟል።' : 'Account deleted permanently.');
-  };
-
-  const unreadNotifCount = notifications.filter((n) => !n.read).length;
-
-  // 1. Standalone Private Mode
-  if (privateUnlocked && privateConfig) {
-    return (
-      <>
-        {toast && (
-          <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] px-4 py-2 rounded-full bg-purple-600 text-white text-xs font-semibold shadow-lg">
-            {toast}
-          </div>
-        )}
-        <PrivateWorkspace
-          lang={lang}
-          config={privateConfig}
-          activeScreen={privateScreen}
-          privateUsers={privateUsers}
-          privatePosts={privatePosts}
-          privateChats={privateChats}
-          privateNotifications={privateNotifs}
-          activePrivateUserId={activePrivateUserId}
-          onNavigate={setPrivateScreen}
-          onSelectPrivateUser={setActivePrivateUserId}
-          onAddPrivatePost={(text, media) => {
-            setPrivatePosts((prev) => [
-              {
-                id: Date.now(),
-                author: privateConfig.alias,
-                text,
-                likes: 0,
-                likedByMe: false,
-                media,
-                comments: [],
-                time: lang === 'am' ? 'አሁን' : 'Just now',
-              },
-              ...prev,
-            ]);
-            showToast(lang === 'am' ? 'በግል ገጽ ተለጥፏል!' : 'Posted to Private Feed!');
-          }}
-          onTogglePrivatePostLike={(postId) => {
-            setPrivatePosts((prev) =>
-              prev.map((p) =>
-                p.id === postId
-                  ? { ...p, likedByMe: !p.likedByMe, likes: p.likedByMe ? p.likes - 1 : p.likes + 1 }
-                  : p
-              )
-            );
-          }}
-          onAddPrivateComment={(postId, text) => {
-            setPrivatePosts((prev) =>
-              prev.map((p) =>
-                p.id === postId
-                  ? {
-                      ...p,
-                      comments: [
-                        ...p.comments,
-                        { id: Date.now(), author: privateConfig.alias, text },
-                      ],
-                    }
-                  : p
-              )
-            );
-          }}
-          onSendPrivateMessage={(userId, text, replyTo, file) => {
-            const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            setPrivateChats((prev) => ({
-              ...prev,
-              [userId]: [
-                ...(prev[userId] || []),
-                { id: Date.now(), from: 'out', text, replyTo, file, status: 'seen', time: now },
-              ],
-            }));
-            setTimeout(() => {
-              setPrivateChats((prev) => ({
-                ...prev,
-                [userId]: [
-                  ...(prev[userId] || []),
-                  {
-                    id: Date.now() + 1,
-                    from: 'in',
-                    text:
-                      lang === 'am'
-                        ? 'ሚስጥራዊ መልእክትዎ ደርሷል 🔮'
-                        : 'Private message received 🔮',
-                    status: 'seen',
-                    time: new Date().toLocaleTimeString([], {
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    }),
-                  },
-                ],
-              }));
-            }, 800);
-          }}
-          onMarkPrivateNotifsRead={() => {
-            setPrivateNotifs((prev) => prev.map((n) => ({ ...n, read: true })));
-          }}
-          onUpdateConfig={(next) => setPrivateConfig(next)}
-          onClearPrivateData={() => {
-            setPrivatePosts(INITIAL_PRIVATE_POSTS);
-            setPrivateChats(INITIAL_PRIVATE_CHATS);
-            showToast(lang === 'am' ? 'የግል ታሪክ ጸድቷል።' : 'Private history cleared.');
-          }}
-          onLockAndExit={() => {
-            if (privateConfig.disappearing) {
-              setPrivateChats(INITIAL_PRIVATE_CHATS);
-            }
-            setPrivateUnlocked(false);
-            setScreen('main');
-            showToast(lang === 'am' ? 'የግል መለያ ተቆልፏል።' : 'Private Account Locked!');
-          }}
-          onNotify={showToast}
-        />
-      </>
-    );
   }
 
-  // 2. Login Screen
-  if (!isLoggedIn || screen === 'login') {
-    return (
-      <>
-        {toast && (
-          <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] px-4 py-2 rounded-full bg-rose-600 text-white text-xs font-semibold shadow-lg">
-            {toast}
-          </div>
-        )}
-        <LoginScreen
-          lang={lang}
-          theme={theme}
-          existingUser={user}
-          onToggleLang={toggleLang}
-          onToggleTheme={toggleTheme}
-                  onLoginSuccess={(matchedUser) => {
-          setIsLoggedIn(true);
-          if (matchedUser) {
-            setUser(matchedUser);
-            setScreen('main');
-            showToast(lang === 'am' ? `እንኳን ደህና መጡ፣ ${matchedUser.name}!` : `Welcome back, ${matchedUser.name}!`);
-          } else {
-            setUser(null);
-            setIsEditingProfile(false);
-            setScreen('register');
-          }
-        }}
-         
-          onNotify={showToast}
-        />
-      </>
-    );
+  async function saveProfile(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!profile || !supabase) return;
+    await run(async () => {
+      const { error: saveError } = await supabase!.from('profiles').upsert({
+        ...profile,
+        display_name: profile.display_name.trim(),
+        city: profile.city?.trim() || null,
+        country: profile.country?.trim() || null,
+        bio: profile.bio.trim(),
+        avatar_url: profile.avatar_url?.trim() || null,
+        languages: profile.languages.filter(Boolean),
+      });
+      if (saveError) throw saveError;
+      await refreshAfterWrite('Profile saved.');
+    });
   }
 
-  // 3. Registration / Edit Profile Screen
-  if (!user || screen === 'register') {
-    return (
-      <>
-        {toast && (
-          <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] px-4 py-2 rounded-full bg-rose-600 text-white text-xs font-semibold shadow-lg">
-            {toast}
-          </div>
-        )}
-        <RegisterScreen
-          lang={lang}
-          initialProfile={isEditingProfile && !isCreatingNewProfile ? user : null}
-          isEditing={isEditingProfile && !isCreatingNewProfile && Boolean(user)}
-          onSave={(profile) => {
-                    addDoc(collection(db, 'users'), {
-          ...profile,
-          id: Date.now(),
-          likedByMe: false,
-          likedByThem: true,
-          isFriend: false,
-          online: true,
-          distance: lang === 'am' ? 'አዲስ ተመዝጋቢ' : 'New Member',
-          color: 'from-rose-500 to-pink-600'
-        }).catch(() => {});
-            setUser(profile);
-            setIsEditingProfile(false);
-            setIsCreatingNewProfile(false);
-            setScreen('main');
-            showToast(
-              lang === 'am' ? 'መገለጫዎ በተሳካ ሁኔታ ተቀምጧል!' : 'Profile saved successfully!'
-            );
-          }}
-          onCancel={
-            user
-              ? () => {
-                  setIsEditingProfile(false);
-                  setIsCreatingNewProfile(false);
-                  setScreen('settings');
-                }
-              : undefined
-          }
-          onNotify={showToast}
-        />
-      </>
-    );
+  async function savePreferences(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!preferences || !supabase) return;
+    await run(async () => {
+      const { error: saveError } = await supabase!.from('match_preferences').upsert({
+        ...preferences,
+        location: preferences.location?.trim() || null,
+        faith: preferences.faith?.trim() || null,
+        languages: preferences.languages.filter(Boolean),
+        intents: preferences.intents.filter(Boolean),
+      });
+      if (saveError) throw saveError;
+      setNotice('Preferences saved.');
+    });
   }
 
-  // 4. Main App Shell
-  const desktopNavItems: {
-    id: MainScreen;
-    labelAm: string;
-    labelEn: string;
-    icon: React.ReactNode;
-    badge?: number;
-  }[] = [
-    { id: 'main', labelAm: 'መነሻ', labelEn: 'Discover', icon: <Compass className="w-5 h-5" /> },
-    { id: 'matches', labelAm: 'ግጥምጥሞሽ', labelEn: 'Matches', icon: <Heart className="w-5 h-5" /> },
-    { id: 'search', labelAm: 'ፍለጋ', labelEn: 'Search', icon: <Search className="w-5 h-5" /> },
-    {
-      id: 'chat',
-      labelAm: 'ቻት',
-      labelEn: 'Chat',
-      icon: <MessageCircle className="w-5 h-5" />,
-      badge: unreadChatCount,
-    },
-    {
-      id: 'notifications',
-      labelAm: 'ማሳወቂያ',
-      labelEn: 'Alerts',
-      icon: <Bell className="w-5 h-5" />,
-      badge: unreadNotifCount,
-    },
-    {
-      id: 'private-gate',
-      labelAm: 'የግል መለያ',
-      labelEn: 'Private',
-      icon: <Lock className="w-5 h-5" />,
-    },
-    {
-      id: 'settings',
-      labelAm: 'መገለጫ እና ቅንብር',
-      labelEn: 'Settings',
-      icon: <Settings className="w-5 h-5" />,
-    },
-  ];
+  async function recordSwipe(action: 'like' | 'pass') {
+    if (!supabase || !user || !candidates[0]) return;
+    setSwiping(true);
+    await run(async () => {
+      const target = candidates[0];
+      const { data: matchId, error: swipeError } = await supabase!.rpc('record_swipe', {
+        target_user_id: target.id,
+        swipe_action: action,
+      });
+      if (swipeError) throw swipeError;
+      setCandidates((current) => current.filter((candidate) => candidate.id !== target.id));
+      if (matchId) {
+        setActiveMatchId(matchId);
+        setNotice(`You matched with ${target.display_name || 'a member'}.`);
+        const { data, error: matchError } = await supabase!.from('matches').select('*').eq('id', matchId).single();
+        if (matchError) throw matchError;
+        setMatches((current) => [{ ...data, partner: target, messages: [] } as Match, ...current.filter((match) => match.id !== matchId)]);
+      } else {
+        setNotice('Your response was saved.');
+      }
+    });
+    setSwiping(false);
+  }
 
-  const mobileBottomTabs: {
-    id: MainScreen;
-    labelAm: string;
-    labelEn: string;
-    icon: React.ReactNode;
-    badge?: number;
-  }[] = [
-    { id: 'main', labelAm: 'መነሻ', labelEn: 'Home', icon: <Compass className="w-5 h-5" /> },
-    { id: 'matches', labelAm: 'ግጥም', labelEn: 'Match', icon: <Heart className="w-5 h-5" /> },
-    { id: 'search', labelAm: 'ፍለጋ', labelEn: 'Search', icon: <Search className="w-5 h-5" /> },
-    {
-      id: 'chat',
-      labelAm: 'ቻት',
-      labelEn: 'Chat',
-      icon: <MessageCircle className="w-5 h-5" />,
-      badge: unreadChatCount,
-    },
-    { id: 'private-gate', labelAm: 'የግል', labelEn: 'Private', icon: <Lock className="w-5 h-5" /> },
-    { id: 'settings', labelAm: 'ቅንብር', labelEn: 'Settings', icon: <Settings className="w-5 h-5" /> },
-  ];
+  async function publishPost(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!supabase || !user || !postBody.trim()) return;
+    await run(async () => {
+      const { data, error: postError } = await supabase!.from('posts').insert({
+        author_id: user.id,
+        body: postBody.trim(),
+        topic: postTopic.trim() || 'community',
+        visibility: postVisibility,
+      }).select('*').single();
+      if (postError) throw postError;
+      if (!data) throw new Error('The post was not returned after saving.');
+      setPosts((current) => [{
+        ...data,
+        comments: [],
+        author_name: profile?.display_name || 'Member',
+      } as Post, ...current]);
+      setPostBody('');
+      setNotice('Post published.');
+    });
+  }
 
-  const selectedPerson =
-    people.find((p) => p.id === selectedPersonId) || people[0];
+  async function addComment(event: FormEvent<HTMLFormElement>, postId: string) {
+    event.preventDefault();
+    if (!supabase || !user) return;
+    const body = commentDrafts[postId]?.trim();
+    if (!body) return;
+    await run(async () => {
+      const { data, error: commentError } = await supabase!.from('post_comments')
+        .insert({ post_id: postId, author_id: user.id, body })
+        .select('*')
+        .single();
+      if (commentError) throw commentError;
+      setPosts((current) => current.map((post) => post.id === postId
+        ? { ...post, comments: [...post.comments, data as Comment] }
+        : post));
+      setCommentDrafts((current) => ({ ...current, [postId]: '' }));
+    }, 'Comment added.');
+  }
 
-  return (
-    <div className="min-h-screen flex flex-col bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100">
-      {toast && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] px-4 py-2 rounded-full bg-rose-600 text-white text-xs font-semibold shadow-lg">
-          {toast}
-        </div>
-      )}
-      {!isOnline && (
-        <div className="fixed bottom-20 lg:bottom-4 left-4 z-[90] flex items-center gap-2 rounded-xl bg-amber-600 px-3 py-2 text-xs font-semibold text-white shadow-lg">
-          <WifiOff className="w-3.5 h-3.5" />
-          <span>
-            {lang === 'am'
-              ? 'ከመስመር ውጭ ነዎት — የተቀመጠ መረጃ ጥቅም ላይ ውሏል።'
-              : 'Offline Mode — Cached data active.'}
-          </span>
-        </div>
-      )}
+  async function sendMessage(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!supabase || !user || !activeMatchId || !messageBody.trim()) return;
+    await run(async () => {
+      const { data, error: sendError } = await supabase!.from('messages')
+        .insert({ match_id: activeMatchId, sender_id: user.id, body: messageBody.trim() })
+        .select('*')
+        .single();
+      if (sendError) throw sendError;
+      setMatches((current) => current.map((match) => match.id === activeMatchId
+        ? { ...match, messages: [...match.messages, data as Message] }
+        : match));
+      setMessageBody('');
+    });
+  }
 
-      {/* Top App Bar */}
-      <header className="sticky top-0 z-30 h-13 lg:h-14 px-4 lg:px-6 bg-white/90 dark:bg-zinc-900/90 backdrop-blur-md border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between gap-4">
-        <button
-          type="button"
-          onClick={() => navigateTo('main')}
-          className="font-display font-bold text-base sm:text-lg text-rose-600 dark:text-rose-500 tracking-tight whitespace-nowrap shrink-0 cursor-pointer"
-        >
-          ፍቅር በነፃ | Fikir BeNetsa
-        </button>
-
-        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-          <button
-            type="button"
-            onClick={() => navigateTo('notifications')}
-            aria-label="Notifications"
-            className={`lg:hidden relative min-h-[40px] min-w-[40px] rounded-xl flex items-center justify-center transition-colors cursor-pointer ${
-              screen === 'notifications'
-                ? 'bg-rose-500/15 text-rose-600 dark:text-rose-400'
-                : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800'
-            }`}
-          >
-            <Bell className="w-5 h-5" />
-            {unreadNotifCount > 0 && (
-              <span className="absolute top-1 right-1 min-w-[16px] h-4 px-1 rounded-full bg-rose-600 text-white text-[9px] font-bold flex items-center justify-center tabular-nums">
-                {unreadNotifCount}
-              </span>
-            )}
-          </button>
-
-          <button
-            type="button"
-            onClick={toggleTheme}
-            aria-label="Toggle theme"
-            className="min-h-[40px] min-w-[40px] rounded-xl flex items-center justify-center text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer"
-          >
-            {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-          </button>
-
-          <button
-            type="button"
-            onClick={toggleLang}
-            className="min-h-[36px] px-3 rounded-xl border border-rose-500/40 text-rose-600 dark:text-rose-400 text-xs font-semibold hover:bg-rose-500/10 transition-colors cursor-pointer whitespace-nowrap"
-          >
-            {lang === 'am' ? 'English' : 'አማርኛ'}
-          </button>
-
-          <button
-            type="button"
-            onClick={() => navigateTo('settings')}
-            aria-label="My Profile & Settings"
-            className="lg:hidden min-h-[40px] min-w-[40px] flex items-center justify-center cursor-pointer"
-          >
-            <Avatar name={user.name} src={user.photos.find(Boolean)} size="xs" />
-          </button>
-        </div>
-      </header>
-
-      {/* Main Workspace */}
-      <div className="flex-1 flex max-w-7xl w-full mx-auto">
-        {/* Desktop Navigation Rail */}
-        <aside className="hidden lg:flex flex-col justify-between w-64 shrink-0 border-r border-zinc-200 dark:border-zinc-800 p-4">
-          <nav className="space-y-1.5">
-            {desktopNavItems.map((item) => {
-              const isActive =
-                screen === item.id || (screen === 'detail' && item.id === previousScreen);
-              const isPrivate = item.id === 'private-gate';
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => navigateTo(item.id)}
-                  className={`w-full min-h-[46px] px-3.5 rounded-xl flex items-center justify-between text-sm font-medium transition-colors cursor-pointer ${
-                    isActive
-                      ? isPrivate
-                        ? 'bg-purple-600 text-white'
-                        : 'bg-rose-600 text-white'
-                      : isPrivate
-                        ? 'text-purple-600 dark:text-purple-400 hover:bg-purple-500/10'
-                        : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200/70 dark:hover:bg-zinc-900'
-                  }`}
-                >
-                  <span className="flex items-center gap-3">
-                    {item.icon}
-                    <span className="whitespace-nowrap">
-                      {lang === 'am' ? item.labelAm : item.labelEn}
-                    </span>
-                  </span>
-                  {item.badge ? (
-                    <span className="px-1.5 py-0.5 rounded-md bg-rose-500 text-white text-[11px] font-bold tabular-nums">
-                      {item.badge}
-                    </span>
-                  ) : null}
-                </button>
-              );
-            })}
-          </nav>
-
-          <button
-            type="button"
-            onClick={() => navigateTo('settings')}
-            className="mt-6 p-3 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 flex items-center gap-3 text-left hover:border-rose-500/40 transition-colors cursor-pointer"
-          >
-            <Avatar
-              name={user.name}
-              src={user.photos.find(Boolean)}
-              size="sm"
-              verified={user.selfieVerified}
-            />
-            <div className="min-w-0">
-              <p className="text-sm font-bold text-zinc-900 dark:text-white truncate tabular-nums">
-                {user.name}, {user.age}
-              </p>
-              <p className="text-xs text-zinc-500 dark:text-zinc-400 truncate">{user.city}</p>
-            </div>
-          </button>
-        </aside>
-
-        {/* Active Screen Viewport */}
-        <main className="flex-1 p-4 sm:p-6 pb-20 lg:pb-8 overflow-y-auto">
-          {screen === 'main' && (
-            <DiscoveryAndPostsScreen
-              lang={lang}
-              currentUser={user}
-              people={people}
-              blockedIds={blockedIds}
-              posts={posts}
-              activeSubTab={subTab}
-              onChangeSubTab={setSubTab}
-              onViewPerson={(id) => {
-                setSelectedPersonId(id);
-                setPreviousScreen('main');
-                setScreen('detail');
-              }}
-              onToggleFriend={handleToggleFriend}
-              onLikePerson={handleLikePerson}
-              onOpenChat={handleOpenChat}
-              onAddPost={(text, visibility, media) => {
-                setPosts((prev) => [
-                  {
-                    id: Date.now(),
-                    author: `${user.name}, ${user.age}`,
-                    text,
-                    likes: 0,
-                    likedByMe: false,
-                    comments: [],
-                    visibility,
-                    media,
-                    createdAt: lang === 'am' ? 'አሁን' : 'Just now',
-                  },
-                  ...prev,
-                ]);
-                showToast(lang === 'am' ? 'ፖስት ተለጥፏል!' : 'Post published!');
-              }}
-              onTogglePostLike={(postId) => {
-                setPosts((prev) =>
-                  prev.map((p) =>
-                    p.id === postId
-                      ? {
-                          ...p,
-                          likedByMe: !p.likedByMe,
-                          likes: p.likedByMe ? p.likes - 1 : p.likes + 1,
-                        }
-                      : p
-                  )
-                );
-              }}
-              onAddComment={(postId, text) => {
-                setPosts((prev) =>
-                  prev.map((p) =>
-                    p.id === postId
-                      ? {
-                          ...p,
-                          comments: [
-                            ...p.comments,
-                            {
-                              id: Date.now(),
-                              author: `${user.name}, ${user.age}`,
-                              text,
-                              createdAt: lang === 'am' ? 'አሁን' : 'Now',
-                            },
-                          ],
-                        }
-                      : p
-                  )
-                );
-              }}
-              onNotify={showToast}
-            />
-          )}
-
-          {screen === 'detail' && selectedPerson && (
-            <UserDetailScreen
-              lang={lang}
-              person={selectedPerson}
-              onBack={() => navigateTo(previousScreen)}
-              onToggleFriend={handleToggleFriend}
-              onLike={handleLikePerson}
-              onOpenChat={handleOpenChat}
-              onBlock={handleBlockPerson}
-              onReport={(name) => setReportTargetName(name)}
-            />
-          )}
-
-          {screen === 'matches' && (
-            <MatchesScreen
-              lang={lang}
-              people={people}
-              blockedIds={blockedIds}
-              onViewPerson={(id) => {
-                setSelectedPersonId(id);
-                setPreviousScreen('matches');
-                setScreen('detail');
-              }}
-              onOpenChat={handleOpenChat}
-            />
-          )}
-
-          {screen === 'search' && (
-            <SearchScreen
-              lang={lang}
-              people={people}
-              blockedIds={blockedIds}
-              onViewPerson={(id) => {
-                setSelectedPersonId(id);
-                setPreviousScreen('search');
-                setScreen('detail');
-              }}
-              onOpenChat={handleOpenChat}
-            />
-          )}
-
-          {screen === 'chat' && (
-            <ChatScreen
-              lang={lang}
-              currentUser={user}
-              people={people}
-              blockedIds={blockedIds}
-              activePersonId={activeChatPersonId}
-              conversations={conversations}
-              messagePrivacy={messagePrivacy}
-              onSelectPerson={setActiveChatPersonId}
-              onSendMessage={handleSendMessage}
-              onBlockPerson={handleBlockPerson}
-              onReportPerson={(name) => setReportTargetName(name)}
-              onOpenSettings={() => navigateTo('settings')}
-              onNotify={showToast}
-            />
-          )}
-          {screen === 'notifications' && (
-            <NotificationsScreen
-              lang={lang}
-              notifications={notifications}
-              onMarkAllRead={() => {
-                setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
-                showToast(lang === 'am' ? 'ሁሉም ተነብበዋል!' : 'All marked as read');
-              }}
-              onRespondFriendRequest={(notifId, personId, accept) => {
-                setNotifications((prev) =>
-                  prev.map((n) =>
-                    n.id === notifId
-                      ? { ...n, read: true, handled: accept ? 'accepted' : 'declined' }
-                      : n
-                  )
-                );
-                if (accept && personId) {
-                  setPeople((prev) =>
-                    prev.map((p) => (p.id === personId ? { ...p, isFriend: true } : p))
-                  );
-                }
-                showToast(
-                  accept
-                    ? lang === 'am'
-                      ? 'የጓደኝነት ጥያቄ ተቀብለዋል!'
-                      : 'Friend request accepted!'
-                    : lang === 'am'
-                      ? 'ጥያቄው ውድቅ ተደርጓል'
-                      : 'Request declined'
-                );
-              }}
-              onViewPerson={(id) => {
-                setSelectedPersonId(id);
-                setPreviousScreen('notifications');
-                setScreen('detail');
-              }}
-            />
-          )}
-
-          {screen === 'private-gate' && (
-            <PrivateGateScreen
-              lang={lang}
-              savedConfig={privateConfig}
-              onUnlock={(cfg) => {
-                setPrivateConfig(cfg);
-                setPrivateUnlocked(true);
-                setPrivateScreen('p-main');
-                showToast(
-                  lang === 'am' ? 'የግል መለያ ተከፍቷል!' : 'Private Account Unlocked!'
-                );
-              }}
-              onResetVault={() => {
-                setPrivateConfig(null);
-                setPrivatePosts(INITIAL_PRIVATE_POSTS);
-                setPrivateChats(INITIAL_PRIVATE_CHATS);
-                showToast(lang === 'am' ? 'የግል መለያ ዳግም ተጀምሯል' : 'Private vault reset');
-              }}
-              onNotify={showToast}
-            />
-          )}
-
-          {screen === 'settings' && (
-            <SettingsScreen
-              lang={lang}
-              theme={theme}
-              user={user}
-              messagePrivacy={messagePrivacy}
-              blockedPeople={people.filter((p) => blockedIds.includes(p.id))}
-              onChangeMessagePrivacy={(val) => {
-                setMessagePrivacy(val);
-                showToast(lang === 'am' ? 'የግላዊነት ቅንብር ተቀምጧል!' : 'Privacy updated!');
-              }}
-              onUnblockPerson={(id) => {
-                setBlockedIds((prev) => prev.filter((x) => x !== id));
-                showToast(lang === 'am' ? 'እገዳው ተነስቷል።' : 'User unblocked');
-              }}
-              onToggleTheme={toggleTheme}
-              onToggleLang={toggleLang}
-              onEditProfile={() => {
-                setIsCreatingNewProfile(false);
-                setIsEditingProfile(true);
-                setScreen('register');
-              }}
-              onCreateNewProfile={() => {
-                setIsEditingProfile(false);
-                setIsCreatingNewProfile(true);
-                setScreen('register');
-              }}
-              onUpdatePhoto={(slotIndex, dataUrl) => {
-                setUser((prev) => {
-                  if (!prev) return prev;
-                  const nextPhotos = [...prev.photos];
-                  nextPhotos[slotIndex] = dataUrl;
-                  return { ...prev, photos: nextPhotos };
-                });
-                showToast(
-                  lang === 'am' ? `ፎቶ ${slotIndex + 1} ተቀይሯል!` : `Photo ${slotIndex + 1} updated!`
-                );
-              }}
-              onChangePassword={(newPassword) => {
-                setUser((prev) => (prev ? { ...prev, password: newPassword } : prev));
-                showToast(
-                  lang === 'am' ? 'የይለፍ ቃልዎ በተሳካ ሁኔታ ተቀይሯል!' : 'Password updated successfully!'
-                );
-              }}
-                      onLogout={() => {
-          localStorage.removeItem(STORAGE_KEYS.user);
-          setUser(null);
-          setIsLoggedIn(false);
-          setScreen('login');
-        }}
-              
-              onRequestDeleteAccount={() => setConfirmDeleteOpen(true)}
-              onNotify={showToast}
-            />
-          )}
-        </main>
-      </div>
-
-      {/* Mobile Bottom Thumb Navigation (<= 15% aggregate sticky height with top header) */}
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 h-15 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-md border-t border-zinc-200 dark:border-zinc-800 grid grid-cols-6">
-        {mobileBottomTabs.map((tab) => {
-          const active =
-            screen === tab.id || (screen === 'detail' && tab.id === previousScreen);
-          const isPrivate = tab.id === 'private-gate';
-          return (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => navigateTo(tab.id)}
-              className={`relative flex flex-col items-center justify-center gap-0.5 text-[10px] font-medium cursor-pointer ${
-                active
-                  ? isPrivate
-                    ? 'text-purple-500 font-semibold'
-                    : 'text-rose-600 dark:text-rose-500 font-semibold'
-                  : 'text-zinc-500 dark:text-zinc-400'
-              }`}
-            >
-              {tab.icon}
-              <span className="truncate max-w-full px-1">
-                {lang === 'am' ? tab.labelAm : tab.labelEn}
-              </span>
-              {tab.badge ? (
-                <span className="absolute top-1.5 right-2.5 min-w-[16px] h-4 px-1 rounded-full bg-rose-600 text-white text-[9px] font-bold flex items-center justify-center tabular-nums">
-                  {tab.badge}
-                </span>
-              ) : null}
-            </button>
-          );
-        })}
-      </nav>
-
-      {/* Global Modals */}
-      <MatchModal
-        person={matchModalPerson}
-        lang={lang}
-        onMessage={(id) => {
-          setMatchModalPerson(null);
-          handleOpenChat(id);
-        }}
-        onClose={() => setMatchModalPerson(null)}
-      />
-
-      <ReportModal
-        targetName={reportTargetName}
-        lang={lang}
-        onSubmit={() => {
-          setReportTargetName(null);
-          showToast(
-            lang === 'am'
-              ? 'ሪፖርትዎ ለአስተዳዳሪዎች ተልኳል!'
-              : 'Report submitted for safety review!'
-          );
-        }}
-        onClose={() => setReportTargetName(null)}
-      />
-
-      <ConfirmModal
-        open={confirmDeleteOpen}
-        title={lang === 'am' ? 'መለያዎን እስከመጨረሻው ማጥፋት?' : 'Delete Account Permanently?'}
-        description={
-          lang === 'am'
-            ? 'ሁሉም መረጃዎ፣ ፎቶዎችዎ እና መልእክቶችዎ እስከመጨረሻው ይጠፋሉ።'
-            : 'All your profile data, photos, and messages will be permanently removed.'
+  async function submitVerification(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!supabase || !user || !ageConfirmed || !identityDocument || verifications.length || verificationSubmitting) return;
+    const form = event.currentTarget;
+    setVerificationSubmitting(true);
+    try {
+      await run(async () => {
+        const body = new FormData();
+        body.append('document', identityDocument);
+        body.append('age_confirmed', 'true');
+        const { data, error: verificationError } = await supabase!.functions.invoke<Verification>('verify-identity', { body });
+        if (verificationError) throw verificationError;
+        if (!data || !['pending', 'verified', 'rejected'].includes(data.status)) {
+          throw new Error('The verification service returned an invalid response.');
         }
-        confirmLabel={lang === 'am' ? 'አዎ፣ አጥፋ' : 'Delete Permanently'}
-        cancelLabel={lang === 'am' ? 'ተወው' : 'Cancel'}
-        onConfirm={handleDeleteAccount}
-        onCancel={() => setConfirmDeleteOpen(false)}
-      />
-    </div>
-  );
+        setVerifications((current) => [data, ...current]);
+        setIdentityDocument(null);
+        setAgeConfirmed(false);
+        form.reset();
+      }, 'Verification request submitted for review.');
+    } finally {
+      setVerificationSubmitting(false);
+    }
+  }
+
+  async function requestSubscription(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!supabase || !user) return;
+    await run(async () => {
+      const { data, error: subscriptionError } = await supabase!.from('subscriptions')
+        .insert({ user_id: user.id, plan_key: planKey, status: 'pending' })
+        .select('id,plan_key,status,created_at')
+        .single();
+      if (subscriptionError) throw subscriptionError;
+      setSubscriptions((current) => [data as Subscription, ...current]);
+    }, 'Pending plan request saved. No payment has been taken.');
+  }
+
+  if (!supabase) {
+    return <main className="setup-page">
+      <h1>Connect Supabase</h1>
+      <p>Set <code>VITE_SUPABASE_URL</code> and <code>VITE_SUPABASE_ANON_KEY</code> in your environment, then restart the app.</p>
+    </main>;
+  }
+
+  if (authLoading) return <main className="setup-page" aria-live="polite">Checking your session…</main>;
+
+  if (!user) {
+    return <main className="auth-page">
+      <section className="auth-card">
+        <p className="eyebrow">Melkam</p>
+        <h1>{authMode === 'sign-in' ? 'Welcome back' : 'Create your account'}</h1>
+        <p>Sign in to continue or create an account to begin.</p>
+        {error && <p className="app-alert error" role="alert">{error}</p>}
+        {notice && <p className="app-alert" role="status">{notice}</p>}
+        <form onSubmit={submitAuth} className="data-form">
+          {authMode === 'sign-up' && <label>Display name<input value={authName} onChange={(event) => setAuthName(event.target.value)} required maxLength={80} /></label>}
+          <label>Email<input type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} required /></label>
+          <label>Password<input type="password" autoComplete={authMode === 'sign-in' ? 'current-password' : 'new-password'} value={password} onChange={(event) => setPassword(event.target.value)} required minLength={8} /></label>
+          <button className="button-primary" type="submit">{authMode === 'sign-in' ? 'Sign in' : 'Create account'} <ArrowRight size={16} /></button>
+        </form>
+        <button className="text-button" onClick={() => { setError(''); setNotice(''); setAuthMode(authMode === 'sign-in' ? 'sign-up' : 'sign-in'); }}>
+          {authMode === 'sign-in' ? 'Need an account? Sign up' : 'Already registered? Sign in'}
+        </button>
+      </section>
+    </main>;
+  }
+
+  return <div className="backend-app">
+    <header className="backend-header">
+      <div><strong>Melkam</strong><span>{profile?.display_name || user.email}</span></div>
+      <button className="button-outline" onClick={() => void run(async () => {
+        const { error: signOutError } = await supabase!.auth.signOut();
+        if (signOutError) throw signOutError;
+      })}><LogOut size={15} /> Sign out</button>
+    </header>
+    <nav className="backend-nav" aria-label="Main navigation">
+      {sections.map((item) => <button key={item.id} className={section === item.id ? 'active' : ''} onClick={() => setSection(item.id)}>{item.label}</button>)}
+    </nav>
+    <main className="backend-content">
+      {error && <p className="app-alert error" role="alert">{error}</p>}
+      {notice && <p className="app-alert" role="status">{notice}</p>}
+      {dataLoading && <p className="empty-copy">Loading your saved data…</p>}
+
+      {!dataLoading && section === 'discover' && <section>
+        <h1>Discover</h1>
+        {candidates[0] ? <article className="data-card">
+          <p className="eyebrow">Member profile</p>
+          <h2>{candidates[0].display_name || 'Member'}{candidates[0].age ? `, ${candidates[0].age}` : ''}</h2>
+          <p>{[candidates[0].city, candidates[0].country].filter(Boolean).join(', ') || 'Location not provided'}</p>
+          {candidates[0].bio && <p>{candidates[0].bio}</p>}
+          <p>{[candidates[0].faith, candidates[0].intent, ...(candidates[0].languages ?? [])].filter(Boolean).join(' · ')}</p>
+          <div className="inline-actions">
+            <button className="button-outline" disabled={swiping} onClick={() => void recordSwipe('pass')}>Pass</button>
+            <button className="button-primary" disabled={swiping} onClick={() => void recordSwipe('like')}><Heart size={15} /> Like</button>
+          </div>
+        </article> : <p className="empty-copy">There are no profiles to show right now.</p>}
+        <h2>Your matches</h2>
+        {matches.length ? <ul className="data-list">{matches.map((match) => <li key={match.id}>
+          <button onClick={() => { setActiveMatchId(match.id); setSection('messages'); }}>{match.partner?.display_name || 'Member'} · matched {new Date(match.created_at).toLocaleDateString()}</button>
+        </li>)}</ul> : <p className="empty-copy">Matches will appear here when both members like each other.</p>}
+      </section>}
+
+      {!dataLoading && section === 'community' && <section>
+        <h1>Community</h1>
+        <form className="data-form data-card" onSubmit={publishPost}>
+          <label>Post<textarea value={postBody} onChange={(event) => setPostBody(event.target.value)} rows={4} maxLength={5000} required /></label>
+          <div className="inline-fields">
+            <label>Topic<input value={postTopic} onChange={(event) => setPostTopic(event.target.value)} maxLength={80} /></label>
+            <label>Visibility<select value={postVisibility} onChange={(event) => setPostVisibility(event.target.value as 'public' | 'matches')}><option value="public">Everyone</option><option value="matches">Matches only</option></select></label>
+          </div>
+          <button className="button-primary" type="submit"><Send size={15} /> Publish</button>
+        </form>
+        {posts.length ? posts.map((post) => <article className="data-card" key={post.id}>
+          <p className="eyebrow">{post.author_name} · {post.topic} · {new Date(post.created_at).toLocaleString()}</p>
+          <p className="post-content">{post.body}</p>
+          <div className="comment-list">{post.comments.map((comment) => <p key={comment.id}>{comment.body}</p>)}</div>
+          <form className="inline-form" onSubmit={(event) => void addComment(event, post.id)}>
+            <input aria-label="Write a comment" placeholder="Write a comment" value={commentDrafts[post.id] ?? ''} onChange={(event) => setCommentDrafts((current) => ({ ...current, [post.id]: event.target.value }))} maxLength={2000} required />
+            <button className="button-outline" type="submit">Comment</button>
+          </form>
+        </article>) : <p className="empty-copy">No posts yet. Share the first one.</p>}
+      </section>}
+
+      {!dataLoading && section === 'messages' && <section>
+        <h1>Messages</h1>
+        {matches.length ? <div className="message-layout">
+          <div className="match-list">{matches.map((match) => <button key={match.id} className={activeMatchId === match.id ? 'active' : ''} onClick={() => setActiveMatchId(match.id)}>{match.partner?.display_name || 'Member'}</button>)}</div>
+          <div className="data-card message-thread">
+            <h2>{matches.find((match) => match.id === activeMatchId)?.partner?.display_name || 'Conversation'}</h2>
+            {(matches.find((match) => match.id === activeMatchId)?.messages ?? []).map((message) => <p className={message.sender_id === user.id ? 'own-message' : ''} key={message.id}>{message.body}<small>{new Date(message.created_at).toLocaleString()}</small></p>)}
+            <form className="inline-form" onSubmit={sendMessage}><input value={messageBody} onChange={(event) => setMessageBody(event.target.value)} maxLength={5000} placeholder="Write a message" required /><button className="button-primary" type="submit"><Send size={15} /></button></form>
+          </div>
+        </div> : <p className="empty-copy">You can message someone after you match.</p>}
+      </section>}
+
+      {!dataLoading && section === 'profile' && profile && <section>
+        <h1>Your profile</h1>
+        <form className="data-form data-card" onSubmit={saveProfile}>
+          <label>Display name<input value={profile.display_name} onChange={(event) => setProfile({ ...profile, display_name: event.target.value })} maxLength={80} required /></label>
+          <div className="inline-fields"><label>Age<input type="number" min={18} max={120} value={profile.age ?? ''} onChange={(event) => setProfile({ ...profile, age: event.target.value ? Number(event.target.value) : null })} /></label>
+            <label>Gender<input value={profile.gender ?? ''} onChange={(event) => setProfile({ ...profile, gender: event.target.value || null })} /></label></div>
+          <div className="inline-fields"><label>City<input value={profile.city ?? ''} onChange={(event) => setProfile({ ...profile, city: event.target.value || null })} /></label>
+            <label>Country<input value={profile.country ?? ''} onChange={(event) => setProfile({ ...profile, country: event.target.value || null })} /></label></div>
+          <label>About you<textarea value={profile.bio} onChange={(event) => setProfile({ ...profile, bio: event.target.value })} maxLength={1000} rows={4} /></label>
+          <div className="inline-fields"><label>Faith<input value={profile.faith ?? ''} onChange={(event) => setProfile({ ...profile, faith: event.target.value || null })} /></label>
+            <label>Looking for<input value={profile.intent ?? ''} onChange={(event) => setProfile({ ...profile, intent: event.target.value || null })} /></label></div>
+          <label>Languages, comma separated<input value={profile.languages.join(', ')} onChange={(event) => setProfile({ ...profile, languages: event.target.value.split(',').map((item) => item.trim()).filter(Boolean) })} /></label>
+          <label>Avatar image URL<input type="url" value={profile.avatar_url ?? ''} onChange={(event) => setProfile({ ...profile, avatar_url: event.target.value || null })} /></label>
+          <label className="checkbox-field"><input type="checkbox" checked={profile.is_visible} onChange={(event) => setProfile({ ...profile, is_visible: event.target.checked })} /> Show my profile to other members</label>
+          <button className="button-primary" type="submit">Save profile <ArrowRight size={15} /></button>
+        </form>
+      </section>}
+
+      {!dataLoading && section === 'preferences' && preferences && <section>
+        <h1>Match preferences</h1>
+        <form className="data-form data-card" onSubmit={savePreferences}>
+          <div className="inline-fields"><label>Minimum age<input type="number" min={18} max={120} value={preferences.min_age} onChange={(event) => setPreferences({ ...preferences, min_age: Number(event.target.value) })} required /></label>
+            <label>Maximum age<input type="number" min={18} max={120} value={preferences.max_age} onChange={(event) => setPreferences({ ...preferences, max_age: Number(event.target.value) })} required /></label></div>
+          <label>Location<input value={preferences.location ?? ''} onChange={(event) => setPreferences({ ...preferences, location: event.target.value || null })} /></label>
+          <label>Faith<input value={preferences.faith ?? ''} onChange={(event) => setPreferences({ ...preferences, faith: event.target.value || null })} /></label>
+          <label>Languages, comma separated<input value={preferences.languages.join(', ')} onChange={(event) => setPreferences({ ...preferences, languages: event.target.value.split(',').map((item) => item.trim()).filter(Boolean) })} /></label>
+          <label>Intentions, comma separated<input value={preferences.intents.join(', ')} onChange={(event) => setPreferences({ ...preferences, intents: event.target.value.split(',').map((item) => item.trim()).filter(Boolean) })} /></label>
+          <button className="button-primary" type="submit">Save preferences <ArrowRight size={15} /></button>
+        </form>
+      </section>}
+
+      {!dataLoading && section === 'verification' && <section>
+        <h1>Verification</h1>
+        <p>Verify your identity by submitting a clear photo of your government ID or passport. Your request will remain pending until it is reviewed.</p>
+        <aside className="privacy-notice" aria-label="Bilingual privacy notice">
+          <strong>Privacy notice / የግላዊነት ማስታወቂያ</strong>
+          <p>Your ID or passport image is sent directly to our verification endpoint and processed transiently in memory. It is never saved to our storage or database; only your verification status is saved.</p>
+          <p lang="am">የመታወቂያ ወይም የፓስፖርት ምስልዎ በቀጥታ ወደ የማረጋገጫ አገልጋያችን ይላካል እና በማህደረ ትውስታ ውስጥ ለጊዜው ብቻ ይሰራል። በማከማቻችንም ሆነ በዳታቤዛችን ፈጽNever አይቀመጥም፤ የማረጋገጫ ሁኔታዎ ብቻ ይቀመጣል።</p>
+        </aside>
+        <form className="data-form data-card" onSubmit={submitVerification}>
+          <label className="upload-zone">
+            {identityDocument ? identityDocument.name : 'Choose an ID or passport image'}
+            <small>JPG, PNG, or WebP · up to 10 MB</small>
+            <input type="file" accept="image/jpeg,image/png,image/webp" required disabled={verifications.length > 0 || verificationSubmitting} onChange={(event) => setIdentityDocument(event.target.files?.[0] ?? null)} />
+          </label>
+          <label className="checkbox-field"><input type="checkbox" checked={ageConfirmed} onChange={(event) => setAgeConfirmed(event.target.checked)} required disabled={verifications.length > 0 || verificationSubmitting} /> I confirm that I am at least 18 years old.</label>
+          <button className="button-primary" type="submit" disabled={verifications.length > 0 || verificationSubmitting || !identityDocument || !ageConfirmed}>
+            {verifications.length ? 'One-time submission used' : verificationSubmitting ? 'Submitting…' : 'Submit for review'} <ShieldCheck size={15} />
+          </button>
+        </form>
+        <h2>Requests</h2>
+        {verifications.length ? <ul className="data-list">{verifications.map((verification) => <li key={verification.id}>Status: {verification.status} · submitted {new Date(verification.submitted_at).toLocaleString()}</li>)}</ul> : <p className="empty-copy">You have no verification requests.</p>}
+      </section>}
+
+      {!dataLoading && section === 'membership' && <section>
+        <h1>Membership</h1>
+        <p>Plan requests are saved as pending. Configure a payment provider before accepting payments or activating subscriptions.</p>
+        <form className="data-form data-card" onSubmit={requestSubscription}>
+          <label>Plan<select value={planKey} onChange={(event) => setPlanKey(event.target.value)}><option value="plus_monthly">Plus — monthly</option><option value="plus_annual">Plus — annual</option></select></label>
+          <button className="button-primary" type="submit">Save pending plan request <ArrowRight size={15} /></button>
+        </form>
+        <h2>Subscription history</h2>
+        {subscriptions.length ? <ul className="data-list">{subscriptions.map((subscription) => <li key={subscription.id}>{subscription.plan_key} · {subscription.status} · {new Date(subscription.created_at).toLocaleDateString()}</li>)}</ul> : <p className="empty-copy">No subscription records.</p>}
+      </section>}
+    </main>
+    <footer className="backend-footer"><button onClick={() => setSection('discover')}><ArrowLeft size={14} /> Back to discover</button><span><MessageCircle size={14} /> Data is protected by Supabase row-level security.</span></footer>
+  </div>;
 }
+
+export default App;
