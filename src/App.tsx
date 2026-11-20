@@ -1,3 +1,4 @@
+import { canSendChatMessage, DEFAULT_LIVE_CONTROLS, DEFAULT_PRIVACY_SETTINGS, isOwnerAccount, loadLiveControls, loadPrivacySettings, saveLiveControls, savePrivacySettings, type ChatBackgroundPreset, type LiveAppControls, type PlanTier, type ThemeMode, type UserPrivacySettings } from "./appIntegration";
 import { FormEvent, useEffect, useState } from 'react';
 import { ArrowLeft, ArrowRight, Heart, LogOut, MessageCircle, Send, ShieldCheck } from 'lucide-react';
 import { User } from '@supabase/supabase-js';
@@ -76,6 +77,9 @@ function App() {
   const [authLoading, setAuthLoading] = useState(true);
   const [dataLoading, setDataLoading] = useState(false);
   const [section, setSection] = useState<Section>('discover');
+  const [privacySettings, setPrivacySettings] = useState<UserPrivacySettings>(() => loadPrivacySettings());
+  const [liveControls, setLiveControls] = useState<LiveAppControls>(() => loadLiveControls());
+  const [ruleNotice, setRuleNotice] = useState<string>("");
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [authMode, setAuthMode] = useState<'sign-in' | 'sign-up'>('sign-in');
@@ -256,7 +260,135 @@ function App() {
       .catch((loadError: unknown) => { if (active) setError(messageOf(loadError)); })
       .finally(() => { if (active) setDataLoading(false); });
 
-    return () => { active = false; };
+    return () =>
+      {ruleNotice && (
+        <div className="notice-banner" role="alert">
+          <p>{ruleNotice}</p>
+        </div>
+      )}
+      <section className="data-card">
+        <h3>Privacy, Theme & Chat Background</h3>
+        <div className="form-grid">
+          <label>
+            Theme
+            <select
+              value={privacySettings.themeMode}
+              onChange={(e) => {
+                const next = { ...privacySettings, themeMode: e.target.value as ThemeMode };
+                setPrivacySettings(next);
+                savePrivacySettings(next);
+              }}
+            >
+              <option value="dark">Dark</option>
+              <option value="light">Light</option>
+            </select>
+          </label>
+          <label>
+            Chat Background
+            <select
+              value={privacySettings.chatBackground}
+              onChange={(e) => {
+                const next = { ...privacySettings, chatBackground: e.target.value as ChatBackgroundPreset };
+                setPrivacySettings(next);
+                savePrivacySettings(next);
+              }}
+            >
+              <option value="classic">Classic</option>
+              <option value="midnight">Midnight</option>
+              <option value="warm-sand">Warm Sand</option>
+              <option value="emerald-mist">Emerald Mist</option>
+            </select>
+          </label>
+          <label>
+            Message Privacy
+            <select
+              value={privacySettings.messagePrivacy}
+              onChange={(e) => {
+                const next = { ...privacySettings, messagePrivacy: e.target.value as UserPrivacySettings["messagePrivacy"] };
+                setPrivacySettings(next);
+                savePrivacySettings(next);
+              }}
+            >
+              <option value="everyone">Everyone</option>
+              <option value="matches_only">Matches Only</option>
+              <option value="private">Private</option>
+            </select>
+          </label>
+          <label>
+            Post Privacy
+            <select
+              value={privacySettings.postPrivacy}
+              onChange={(e) => {
+                const next = { ...privacySettings, postPrivacy: e.target.value as UserPrivacySettings["postPrivacy"] };
+                setPrivacySettings(next);
+                savePrivacySettings(next);
+              }}
+            >
+              <option value="everyone">Everyone</option>
+              <option value="matches_only">Matches Only</option>
+              <option value="private">Private</option>
+            </select>
+          </label>
+          <label className="checkbox-row">
+            <input
+              type="checkbox"
+              checked={privacySettings.hideOnlineStatus}
+              onChange={(e) => {
+                const next = { ...privacySettings, hideOnlineStatus: e.target.checked };
+                setPrivacySettings(next);
+                savePrivacySettings(next);
+              }}
+            />
+            Hide Online Status
+          </label>
+        </div>
+      </section>
+      {isOwnerAccount((user as { email?: string | null } | null)?.email, (profile as { role?: string | null } | null)?.role) && (
+        <section className="data-card">
+          <h3>Owner Live Controls</h3>
+          <div className="form-grid">
+            <label>
+              Message Limit Before Paywall
+              <input
+                type="number"
+                min={1}
+                max={100}
+                value={liveControls.messageLimitBeforePaywall}
+                onChange={(e) => {
+                  const next = { ...liveControls, messageLimitBeforePaywall: Math.max(1, Number(e.target.value) || DEFAULT_LIVE_CONTROLS.messageLimitBeforePaywall) };
+                  setLiveControls(next);
+                  saveLiveControls(next);
+                }}
+              />
+            </label>
+            <label className="checkbox-row">
+              <input
+                type="checkbox"
+                checked={liveControls.blockMessagesToVip}
+                onChange={(e) => {
+                  const next = { ...liveControls, blockMessagesToVip: e.target.checked };
+                  setLiveControls(next);
+                  saveLiveControls(next);
+                }}
+              />
+              Block Messages to VIP
+            </label>
+            <label className="checkbox-row">
+              <input
+                type="checkbox"
+                checked={liveControls.maintenanceMode}
+                onChange={(e) => {
+                  const next = { ...liveControls, maintenanceMode: e.target.checked };
+                  setLiveControls(next);
+                  saveLiveControls(next);
+                }}
+              />
+              Maintenance Mode
+            </label>
+          </div>
+        </section>
+      )}
+ { active = false; };
   }, [user?.id]);
 
   async function run(action: () => Promise<void>, success?: string) {
@@ -397,6 +529,27 @@ function App() {
   }
 
   async function sendMessage(event: FormEvent<HTMLFormElement>) {
+    setRuleNotice("");
+    const currentUserEmail = (user as { email?: string | null } | null)?.email || null;
+    const currentUserRole = (profile as { role?: string | null; plan_tier?: PlanTier | null } | null)?.role || null;
+    const senderTier: PlanTier = (profile as { plan_tier?: PlanTier | null } | null)?.plan_tier || "normal";
+    const isOwner = isOwnerAccount(currentUserEmail, currentUserRole);
+    const activeMatch = matches.find((item) => item.id === activeMatchId);
+    const recipientTier: PlanTier = ((activeMatch as { partner?: { plan_tier?: PlanTier } } | undefined)?.partner?.plan_tier) || "normal";
+    const sentCount = (activeMatch?.messages || []).filter((msg) => msg.sender_id === user?.id).length;
+    const check = canSendChatMessage({
+      senderTier,
+      recipientTier,
+      messagesSentCount: sentCount,
+      isSenderOwner: isOwner,
+      liveControls,
+    });
+    if (!check.allowed) {
+      const msg = [check.reasonAm, check.reasonEn].filter(Boolean).join(" / ");
+      setRuleNotice(msg);
+      if (check.requiresPayment) setSection("subscriptions");
+      return;
+    }
     event.preventDefault();
     if (!supabase || !user || !activeMatchId || !messageBody.trim()) return;
     await run(async () => {
