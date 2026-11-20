@@ -604,7 +604,7 @@ function App() {
 
       {!dataLoading && section === 'membership' && <section>
         <h1>Membership</h1>
-        <p>Plan requests are saved as pending. Configure a payment provider before accepting payments or activating subscriptions.</p>
+        <p>Plan requests support Chapa, Telebirr, and Stripe with a 5-message limit and VIP messaging rules.</p>
         <form className="data-form data-card" onSubmit={requestSubscription}>
           <label>Plan<select value={planKey} onChange={(event) => setPlanKey(event.target.value)}><option value="plus_monthly">Plus — monthly</option><option value="plus_annual">Plus — annual</option></select></label>
           <button className="button-primary" type="submit">Save pending plan request <ArrowRight size={15} /></button>
